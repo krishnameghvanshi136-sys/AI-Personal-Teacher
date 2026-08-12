@@ -19,7 +19,7 @@ jobs:
         with:
           channel: stable
 
-      - name: Find and extract app source
+      - name: Find Flutter app
         shell: bash
         run: |
           set -e
@@ -27,33 +27,51 @@ jobs:
           rm -rf build_source
           mkdir -p build_source
 
-          ZIP_FILE=$(find . -maxdepth 2 -type f \( -iname "*.zip" \) | head -n 1 || true)
+          ZIP_FILE=$(find . -type f -iname "*.zip" | head -n 1 || true)
 
           if [ -n "$ZIP_FILE" ]; then
-            echo "Found ZIP: $ZIP_FILE"
+            echo "ZIP found: $ZIP_FILE"
             unzip -q "$ZIP_FILE" -d build_source
           else
-            echo "No ZIP found. Using repository files directly."
+            echo "No ZIP found."
             cp -R . build_source/repository
           fi
 
-      - name: Locate Flutter project
-        shell: bash
-        run: |
-          set -e
-
-          PUBSPEC=$(find build_source -type f -name "pubspec.yaml" | head -n 1 || true)
+          PUBSPEC=$(find build_source \
+            -type f \
+            -name "pubspec.yaml" \
+            -not -path "*/android/*" \
+            | head -n 1 || true)
 
           if [ -z "$PUBSPEC" ]; then
-            echo "ERROR: pubspec.yaml was not found."
-            echo "The uploaded app source/ZIP could not be located."
+            PUBSPEC=$(find build_source \
+              -type f \
+              -name "pubspec.yaml" \
+              | head -n 1 || true)
+          fi
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "ERROR: pubspec.yaml not found."
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$PUBSPEC")
 
-          echo "Flutter project found at: $PROJECT_DIR"
+          echo "Flutter project: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Create Android project
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f "android/app/build.gradle" ] && [ ! -f "android/app/build.gradle.kts" ]; then
+            echo "Android project missing. Generating Android platform..."
+            flutter create --platforms=android .
+          else
+            echo "Android project already exists."
+          fi
 
       - name: Get dependencies
         working-directory: ${{ env.PROJECT_DIR }}
