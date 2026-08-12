@@ -14,16 +14,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare Flutter project
-        run: |
-          rm -rf app
-          mkdir app
-          unzip -q AI_Personal_Teacher_v21_Beta_Ready.zip -d app
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Create Android project
+        run: flutter create --platforms=android --project-name ai_personal_teacher app
+
+      - name: Copy app source
+        run: |
+          cp -r lib app/
+          cp pubspec.yaml app/
 
       - name: Get dependencies
         working-directory: app
