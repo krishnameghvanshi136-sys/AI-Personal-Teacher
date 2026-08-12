@@ -23,6 +23,7 @@ jobs:
         run: |
           rm -rf app
           flutter create --platforms=android app
+              cp pubspec.yaml app/pubspec.yaml
 
       - name: Copy app source
         run: |
