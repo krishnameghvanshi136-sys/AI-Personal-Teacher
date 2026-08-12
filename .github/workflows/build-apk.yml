@@ -24,14 +24,10 @@ jobs:
           rm -rf app
           flutter create --platforms=android app
 
-      - name: Check source
+      - name: Copy app source
         run: |
-          if [ -d "source/lib" ]; then
-            rm -rf app/lib
-            cp -r source/lib app/lib
-          else
-            echo "source/lib नहीं मिला। अभी basic Flutter app बनाया जाएगा।"
-          fi
+          rm -rf app/lib
+          cp -r lib app/lib
 
       - name: Get dependencies
         working-directory: app
