@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -30,6 +29,10 @@ jobs:
         run: |
           rm -rf app/lib
           cp -r lib app/lib
+
+      - name: Add Internet permission
+        run: |
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' app/android/app/src/main/AndroidManifest.xml
 
       - name: Get dependencies
         working-directory: app
