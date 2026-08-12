@@ -19,46 +19,53 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Android project
+      - name: Find and extract app source
+        shell: bash
         run: |
-          rm -rf app
-          mkdir app
-          cd app
-          flutter create --platforms=android .
+          set -e
 
-      - name: Disable R8
-        run: |
-          sed -i 's/minifyEnabled true/minifyEnabled false/g' app/android/app/build.gradle
-          sed -i 's/shrinkResources true/shrinkResources false/g' app/android/app/build.gradle
-          sed -i 's/minifyEnabled = true/minifyEnabled = false/g' app/android/app/build.gradle
-          sed -i 's/shrinkResources = true/shrinkResources = false/g' app/android/app/build.gradle
+          rm -rf build_source
+          mkdir -p build_source
 
-      - name: Extract app source
+          ZIP_FILE=$(find . -maxdepth 2 -type f \( -iname "*.zip" \) | head -n 1 || true)
+
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found ZIP: $ZIP_FILE"
+            unzip -q "$ZIP_FILE" -d build_source
+          else
+            echo "No ZIP found. Using repository files directly."
+            cp -R . build_source/repository
+          fi
+
+      - name: Locate Flutter project
+        shell: bash
         run: |
-          mkdir -p source
-          ZIP=$(find . -maxdepth 1 -type f -iname 'AI_Personal_Teacher_v21_Beta_Ready*.zip' | head -n 1)
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: AI_Personal_Teacher_v21_Beta_Ready ZIP not found."
+          set -e
+
+          PUBSPEC=$(find build_source -type f -name "pubspec.yaml" | head -n 1 || true)
+
+          if [ -z "$PUBSPEC" ]; then
+            echo "ERROR: pubspec.yaml was not found."
+            echo "The uploaded app source/ZIP could not be located."
             exit 1
           fi
-          unzip -q "$ZIP" -d source
 
-      - name: Copy app source
-        run: |
-          cp -r source/lib app/
-          cp source/pubspec.yaml app/
-          if [ -f source/README.md ]; then cp source/README.md app/; fi
+          PROJECT_DIR=$(dirname "$PUBSPEC")
+
+          echo "Flutter project found at: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Get dependencies
-        working-directory: app
+        working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
 
       - name: Build APK
-        working-directory: app
+        working-directory: ${{ env.PROJECT_DIR }}
         run: flutter build apk --release --no-shrink
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          path: ${{ env.PROJECT_DIR }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
