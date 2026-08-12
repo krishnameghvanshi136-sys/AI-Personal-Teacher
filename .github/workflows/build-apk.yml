@@ -1,0 +1,64 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android project
+        run: |
+          rm -rf app
+          mkdir app
+          cd app
+          flutter create --platforms=android .
+
+      - name: Disable R8
+        run: |
+          sed -i 's/minifyEnabled true/minifyEnabled false/g' app/android/app/build.gradle
+          sed -i 's/shrinkResources true/shrinkResources false/g' app/android/app/build.gradle
+          sed -i 's/minifyEnabled = true/minifyEnabled = false/g' app/android/app/build.gradle
+          sed -i 's/shrinkResources = true/shrinkResources = false/g' app/android/app/build.gradle
+
+      - name: Extract app source
+        run: |
+          mkdir -p source
+          ZIP=$(find . -maxdepth 1 -type f -iname 'AI_Personal_Teacher_v21_Beta_Ready*.zip' | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "ERROR: AI_Personal_Teacher_v21_Beta_Ready ZIP not found."
+            exit 1
+          fi
+          unzip -q "$ZIP" -d source
+
+      - name: Copy app source
+        run: |
+          cp -r source/lib app/
+          cp source/pubspec.yaml app/
+          if [ -f source/README.md ]; then cp source/README.md app/; fi
+
+      - name: Get dependencies
+        working-directory: app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: app
+        run: flutter build apk --release --no-shrink
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Personal-Teacher-APK
+          path: app/build/app/outputs/flutter-apk/app-release.apk
