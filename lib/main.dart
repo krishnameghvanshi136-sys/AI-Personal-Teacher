@@ -2,13 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-
-const String geminiApiKey =
-    String.fromEnvironment('GEMINI_API_KEY');
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 void main() {
   runApp(const AIPersonalTeacher());
@@ -37,22 +34,16 @@ class TeacherHomePage extends StatefulWidget {
   const TeacherHomePage({super.key});
 
   @override
-  State<TeacherHomePage> createState() =>
-      _TeacherHomePageState();
+  State<TeacherHomePage> createState() => _TeacherHomePageState();
 }
 
 class _TeacherHomePageState extends State<TeacherHomePage> {
-  final TextEditingController controller =
+  final TextEditingController questionController =
       TextEditingController();
 
-  final stt.SpeechToText speech =
-      stt.SpeechToText();
-
-  final FlutterTts tts =
-      FlutterTts();
-
-  final ImagePicker picker =
-      ImagePicker();
+  final ImagePicker picker = ImagePicker();
+  final stt.SpeechToText speech = stt.SpeechToText();
+  final FlutterTts tts = FlutterTts();
 
   bool listening = false;
   bool loading = false;
@@ -61,62 +52,195 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   XFile? selectedImage;
 
   String answer =
-      'नमस्ते! 👋\n\n'
-      'मैं आपका AI Personal Teacher हूँ।\n\n'
-      'अपना सवाल लिखकर Send दबाइए।';
+      'नमस्ते! मैं आपका AI Personal Teacher हूँ।\n\n'
+      'आप मुझसे कोई भी सवाल पूछ सकते हैं।';
+
+  // API key GitHub Actions से dart-define के द्वारा आएगी।
+  static const String apiKey =
+      String.fromEnvironment('GEMINI_API_KEY');
+
+  // Stable Gemini model.
+  static const String model = 'gemini-2.5-flash';
 
   @override
   void initState() {
     super.initState();
 
-    tts.setLanguage('hi-IN');
-    tts.setSpeechRate(0.45);
-    tts.setPitch(1.0);
+    _setupTts();
   }
 
-  // ==============================
-  // GEMINI AI
-  // ==============================
+  Future<void> _setupTts() async {
+    await tts.setLanguage('hi-IN');
+    await tts.setSpeechRate(0.45);
+    await tts.setVolume(1.0);
+    await tts.setPitch(1.0);
+  }
+
+  Future<void> speak(String text) async {
+    try {
+      await tts.stop();
+      await tts.setLanguage('hi-IN');
+      await tts.setSpeechRate(0.45);
+      await tts.setVolume(1.0);
+      await tts.speak(text);
+    } catch (e) {
+      debugPrint('TTS Error: $e');
+    }
+  }
+
+  Future<void> pickPhoto() async {
+    try {
+      final XFile? image =
+          await picker.pickImage(source: ImageSource.gallery);
+
+      if (image == null) return;
+
+      setState(() {
+        selectedImage = image;
+        answer =
+            '📷 फोटो मिल गई है।\n\nअब फोटो के बारे में सवाल पूछिए।';
+      });
+
+      await speak(
+        'फोटो मिल गई है। अब फोटो के बारे में सवाल पूछिए।',
+      );
+    } catch (e) {
+      setState(() {
+        answer = 'फोटो चुनने में समस्या हुई।';
+      });
+
+      await speak('फोटो चुनने में समस्या हुई।');
+    }
+  }
+
+  Future<void> takePhoto() async {
+    try {
+      final XFile? image =
+          await picker.pickImage(source: ImageSource.camera);
+
+      if (image == null) return;
+
+      setState(() {
+        selectedImage = image;
+        answer =
+            '📷 फोटो तैयार है।\n\nअब फोटो के बारे में सवाल पूछिए।';
+      });
+
+      await speak(
+        'फोटो तैयार है। अब फोटो के बारे में सवाल पूछिए।',
+      );
+    } catch (e) {
+      setState(() {
+        answer = 'कैमरा खोलने में समस्या हुई।';
+      });
+
+      await speak('कैमरा खोलने में समस्या हुई।');
+    }
+  }
+
+  Future<void> startListening() async {
+    if (listening) {
+      await speech.stop();
+
+      setState(() {
+        listening = false;
+      });
+
+      return;
+    }
+
+    try {
+      final available = await speech.initialize(
+        onError: (error) {
+          if (mounted) {
+            setState(() {
+              listening = false;
+              answer = '🎤 आवाज़ पहचानने में समस्या हुई।';
+            });
+          }
+        },
+      );
+
+      if (!available) {
+        setState(() {
+          answer =
+              '🎤 Microphone उपलब्ध नहीं है। कृपया microphone permission दें।';
+        });
+
+        await speak(
+          'Microphone उपलब्ध नहीं है। कृपया microphone permission दें।',
+        );
+
+        return;
+      }
+
+      setState(() {
+        listening = true;
+      });
+
+      await speech.listen(
+        localeId: 'hi_IN',
+        listenMode: stt.ListenMode.dictation,
+        onResult: (result) {
+          if (!mounted) return;
+
+          setState(() {
+            questionController.text = result.recognizedWords;
+            questionController.selection =
+                TextSelection.fromPosition(
+              TextPosition(
+                offset: questionController.text.length,
+              ),
+            );
+          });
+        },
+      );
+    } catch (e) {
+      setState(() {
+        listening = false;
+        answer = '🎤 Voice input में समस्या हुई।';
+      });
+    }
+  }
 
   Future<String> askGemini(String question) async {
-    if (geminiApiKey.isEmpty) {
+    if (apiKey.trim().isEmpty) {
       throw Exception(
-        'GEMINI_API_KEY नहीं मिली।\n'
-        'GitHub Actions में secret सही नाम से जोड़ें।',
+        'GEMINI_API_KEY उपलब्ध नहीं है। GitHub Actions Secret check करें।',
       );
     }
 
-    final List<Map<String, dynamic>> parts = [];
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/'
+      'models/$model:generateContent',
+    );
 
-    parts.add({
-      'text': '''
-आप एक बहुत अच्छे AI Personal Teacher हैं।
+    String prompt =
+        '''
+आप AI Personal Teacher हैं।
 
-यूज़र के सवाल का जवाब आसान हिंदी/Hinglish में दें।
-अगर सवाल पढ़ाई से जुड़ा है तो step-by-step समझाएँ।
-गणित में calculation साफ दिखाएँ।
-अगर बच्चा सवाल पूछ रहा है तो बहुत आसान भाषा इस्तेमाल करें।
-जवाब में अनावश्यक बातें न करें।
+हमेशा आसान और साफ हिंदी में जवाब दें।
+अगर सवाल गणित का है तो calculation step-by-step समझाएं।
+अगर सवाल पढ़ाई का है तो student को teacher की तरह समझाएं।
+अगर सवाल बहुत छोटा है तो छोटा और सीधा जवाब दें।
+जरूरत होने पर उदाहरण दें।
 
-यूज़र का सवाल:
+Student का सवाल:
 $question
-'''
-    });
+''';
+
+    final List<Map<String, dynamic>> parts = [];
 
     if (selectedImage != null) {
       final bytes =
           await File(selectedImage!.path).readAsBytes();
 
-      final base64Image =
-          base64Encode(bytes);
-
-      final extension =
-          selectedImage!.path
-              .split('.')
-              .last
-              .toLowerCase();
+      final base64Image = base64Encode(bytes);
 
       String mimeType = 'image/jpeg';
+
+      final extension =
+          selectedImage!.path.split('.').last.toLowerCase();
 
       if (extension == 'png') {
         mimeType = 'image/png';
@@ -128,59 +252,63 @@ $question
         'inline_data': {
           'mime_type': mimeType,
           'data': base64Image,
-        }
+        },
       });
     }
 
-    final url = Uri.parse(
-      'https://generativelanguage.googleapis.com/'
-      'v1beta/models/gemini-3.6-flash:generateContent',
-    );
+    parts.add({
+      'text': prompt,
+    });
 
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': geminiApiKey,
-      },
-      body: jsonEncode({
-        'contents': [
-          {
-            'role': 'user',
-            'parts': parts,
-          }
-        ],
-        'generationConfig': {
-          'temperature': 0.7,
-          'maxOutputTokens': 1200,
-        },
-      }),
-    );
+    final response = await http
+        .post(
+          url,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: jsonEncode({
+            'contents': [
+              {
+                'role': 'user',
+                'parts': parts,
+              }
+            ],
+            'generationConfig': {
+              'temperature': 0.4,
+              'maxOutputTokens': 1000,
+            },
+          }),
+        )
+        .timeout(const Duration(seconds: 40));
+
+    debugPrint('Gemini Status: ${response.statusCode}');
+    debugPrint('Gemini Response: ${response.body}');
 
     if (response.statusCode != 200) {
-      String message = 'Gemini API Error';
+      String errorMessage =
+          'Gemini API Error: ${response.statusCode}';
 
       try {
-        final data =
-            jsonDecode(response.body);
+        final errorData = jsonDecode(response.body);
 
-        message =
-            data['error']?['message'] ??
-                message;
+        final apiError =
+            errorData['error']?['message'];
+
+        if (apiError != null) {
+          errorMessage = apiError.toString();
+        }
       } catch (_) {}
 
-      throw Exception(
-        '$message\n\nHTTP ${response.statusCode}',
-      );
+      throw Exception(errorMessage);
     }
 
-    final data =
-        jsonDecode(response.body);
+    final data = jsonDecode(response.body);
 
-    final candidates =
-        data['candidates'];
+    final candidates = data['candidates'];
 
     if (candidates == null ||
+        candidates is! List ||
         candidates.isEmpty) {
       throw Exception(
         'Gemini ने कोई जवाब नहीं दिया।',
@@ -191,220 +319,131 @@ $question
         candidates[0]['content'];
 
     final responseParts =
-        content['parts'];
+        content?['parts'];
 
     if (responseParts == null ||
+        responseParts is! List ||
         responseParts.isEmpty) {
       throw Exception(
-        'AI response खाली मिला।',
+        'Gemini response खाली है।',
       );
     }
 
-    final buffer =
-        StringBuffer();
+    final buffer = StringBuffer();
 
     for (final part in responseParts) {
-      if (part['text'] != null) {
-        buffer.write(part['text']);
+      final text = part['text'];
+
+      if (text != null) {
+        buffer.write(text);
       }
     }
 
-    final result =
-        buffer.toString().trim();
+    final result = buffer.toString().trim();
 
     if (result.isEmpty) {
       throw Exception(
-        'AI ने खाली जवाब दिया।',
+        'Gemini ने खाली जवाब दिया।',
       );
     }
 
     return result;
   }
 
-  // ==============================
-  // SEND QUESTION
-  // ==============================
-
   Future<void> askTeacher() async {
+    if (loading) return;
+
     final question =
-        controller.text.trim();
+        questionController.text.trim();
 
     if (question.isEmpty &&
         selectedImage == null) {
+      setState(() {
+        answer =
+            '✍️ पहले अपना सवाल लिखिए या फोटो भेजिए।';
+      });
+
+      await speak(
+        'पहले अपना सवाल लिखिए या फोटो भेजिए।',
+      );
+
       return;
     }
-
-    if (loading) return;
 
     setState(() {
       loading = true;
-      answer =
-          '🤖 AI सोच रहा है...\n\nकृपया थोड़ा इंतजार करें।';
+      answer = '🤖 AI Teacher सोच रहा है...';
     });
 
     try {
-      final result =
-          await askGemini(
-        question.isEmpty
-            ? 'इस फोटो को देखकर समझाइए कि इसमें क्या है।'
-            : question,
-      );
+      final finalQuestion = question.isEmpty
+          ? 'इस फोटो को देखकर विद्यार्थी को आसान हिंदी में समझाइए।'
+          : question;
+
+      final response =
+          await askGemini(finalQuestion);
 
       if (!mounted) return;
 
       setState(() {
-        answer = result;
+        answer = response;
         loading = false;
       });
 
-      await tts.stop();
-      await tts.speak(result);
-    } catch (e) {
-      if (!mounted) return;
+      // Gemini response के बाद आवाज़।
+      await speak(response);
 
-      final error =
-          e.toString()
-              .replaceFirst('Exception: ', '');
-
-      setState(() {
-        answer =
-            '❌ AI से जवाब नहीं मिला।\n\n$error';
-        loading = false;
-      });
-    }
-  }
-
-  // ==============================
-  // MICROPHONE
-  // ==============================
-
-  Future<void> startListening() async {
-    if (listening) {
-      await speech.stop();
-
+      // सफल जवाब के बाद input clear करें।
       if (mounted) {
         setState(() {
-          listening = false;
+          questionController.clear();
+          selectedImage = null;
         });
       }
+    } on SocketException {
+      if (!mounted) return;
 
-      return;
-    }
-
-    final available =
-        await speech.initialize(
-      onStatus: (status) {
-        if (status == 'done' &&
-            mounted) {
-          setState(() {
-            listening = false;
-          });
-        }
-      },
-      onError: (error) {
-        if (mounted) {
-          setState(() {
-            listening = false;
-            answer =
-                '🎤 Microphone error:\n${error.errorMsg}';
-          });
-        }
-      },
-    );
-
-    if (!available) {
       setState(() {
+        loading = false;
         answer =
-            '🎤 Microphone उपलब्ध नहीं है।\n\n'
-            'Microphone permission दें।';
+            '❌ Internet connection नहीं है।\n\n'
+            'कृपया internet check करके दोबारा कोशिश करें।';
       });
-      return;
-    }
 
+      await speak(
+        'Internet connection नहीं है। कृपया internet check करके दोबारा कोशिश करें।',
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      final errorText = e.toString();
+
+      setState(() {
+        loading = false;
+        answer =
+            '❌ AI से जवाब नहीं मिला।\n\n'
+            '$errorText';
+      });
+
+      await speak(
+        'AI से जवाब नहीं मिला। कृपया दोबारा कोशिश करें।',
+      );
+    }
+  }
+
+  void changeMode(bool teacher) {
     setState(() {
-      listening = true;
+      teacherMode = teacher;
     });
-
-    await speech.listen(
-      localeId: 'hi_IN',
-      listenMode: stt.ListenMode.dictation,
-      onResult: (result) {
-        if (!mounted) return;
-
-        setState(() {
-          controller.text =
-              result.recognizedWords;
-
-          controller.selection =
-              TextSelection.fromPosition(
-            TextPosition(
-              offset: controller.text.length,
-            ),
-          );
-        });
-      },
-    );
   }
 
-  // ==============================
-  // GALLERY
-  // ==============================
-
-  Future<void> pickPhoto() async {
-    try {
-      final image =
-          await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-
-      if (image == null) return;
-
-      setState(() {
-        selectedImage = image;
-        answer =
-            '📷 फोटो select हो गई है।\n\n'
-            'अब सवाल लिखकर Send दबाएँ।';
-      });
-    } catch (e) {
-      setState(() {
-        answer =
-            '❌ फोटो select नहीं हो सकी।\n\n$e';
-      });
-    }
+  @override
+  void dispose() {
+    questionController.dispose();
+    speech.stop();
+    tts.stop();
+    super.dispose();
   }
-
-  // ==============================
-  // CAMERA
-  // ==============================
-
-  Future<void> takePhoto() async {
-    try {
-      final image =
-          await picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-      );
-
-      if (image == null) return;
-
-      setState(() {
-        selectedImage = image;
-        answer =
-            '📸 फोटो तैयार है।\n\n'
-            'अब अपना सवाल पूछिए।';
-      });
-    } catch (e) {
-      setState(() {
-        answer =
-            '❌ Camera नहीं खुल सका।\n\n$e';
-      });
-    }
-  }
-
-  // ==============================
-  // BUILD
-  // ==============================
 
   @override
   Widget build(BuildContext context) {
@@ -422,100 +461,52 @@ $question
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // MODE BUTTONS
             Padding(
               padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 16,
-              ),
+                  const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
                     child: ChoiceChip(
                       label: const Text(
                         '🤖 AI Teacher',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
                       ),
                       selected: teacherMode,
-                      onSelected: (_) {
-                        setState(() {
-                          teacherMode = true;
-                        });
-                      },
+                      onSelected: (_) =>
+                          changeMode(true),
                     ),
                   ),
-
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: ChoiceChip(
                       label: const Text(
                         '📚 Study Mode',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
                       ),
                       selected: !teacherMode,
-                      onSelected: (_) {
-                        setState(() {
-                          teacherMode = false;
-                        });
-                      },
+                      onSelected: (_) =>
+                          changeMode(false),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // ANSWER
             Expanded(
               child: ListView(
-                padding:
-                    const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 children: [
                   if (selectedImage != null)
                     Card(
                       child: Padding(
                         padding:
-                            const EdgeInsets.all(10),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.image,
-                              size: 30,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                selectedImage!.name,
-                                maxLines: 1,
-                                overflow:
-                                    TextOverflow
-                                        .ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  selectedImage =
-                                      null;
-                                });
-                              },
-                              icon: const Icon(
-                                Icons.close,
-                              ),
-                            ),
-                          ],
+                            const EdgeInsets.all(8),
+                        child: Text(
+                          '📷 Photo selected\n'
+                          '${selectedImage!.name}',
                         ),
                       ),
                     ),
@@ -523,7 +514,7 @@ $question
                   const SizedBox(height: 10),
 
                   Card(
-                    elevation: 4,
+                    elevation: 3,
                     child: Padding(
                       padding:
                           const EdgeInsets.all(18),
@@ -533,17 +524,16 @@ $question
                                 CircularProgressIndicator(),
                                 SizedBox(height: 15),
                                 Text(
-                                  'AI जवाब तैयार कर रहा है...',
+                                  '🤖 AI Teacher जवाब तैयार कर रहा है...',
                                   style: TextStyle(
                                     fontSize: 18,
                                   ),
                                 ),
                               ],
                             )
-                          : SelectableText(
+                          : Text(
                               answer,
-                              style:
-                                  const TextStyle(
+                              style: const TextStyle(
                                 fontSize: 18,
                                 height: 1.5,
                               ),
@@ -554,18 +544,10 @@ $question
               ),
             ),
 
-            // INPUT
             Padding(
               padding:
-                  const EdgeInsets.fromLTRB(
-                8,
-                4,
-                8,
-                10,
-              ),
+                  const EdgeInsets.fromLTRB(8, 4, 8, 8),
               child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.end,
                 children: [
                   IconButton(
                     tooltip: 'Gallery',
@@ -589,11 +571,10 @@ $question
 
                   Expanded(
                     child: TextField(
-                      controller: controller,
+                      controller:
+                          questionController,
                       minLines: 1,
                       maxLines: 4,
-                      textInputAction:
-                          TextInputAction.newline,
                       decoration:
                           InputDecoration(
                         hintText: listening
@@ -602,22 +583,13 @@ $question
                         border:
                             OutlineInputBorder(
                           borderRadius:
-                              BorderRadius.circular(
-                            25,
-                          ),
-                        ),
-                        contentPadding:
-                            const EdgeInsets
-                                .symmetric(
-                          horizontal: 18,
-                          vertical: 12,
+                              BorderRadius.circular(25),
                         ),
                       ),
                     ),
                   ),
 
                   IconButton(
-                    tooltip: 'Voice',
                     onPressed:
                         loading
                             ? null
@@ -634,7 +606,6 @@ $question
                   ),
 
                   IconButton(
-                    tooltip: 'Send',
                     onPressed:
                         loading
                             ? null
