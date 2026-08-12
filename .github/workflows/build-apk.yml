@@ -77,6 +77,24 @@ jobs:
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter pub get
 
+     - name: Disable R8 in Android Gradle
+        working-directory: ${{ env.PROJECT_DIR }}
+        shell: bash
+        run: |
+          set -e
+
+          if [ -f android/app/build.gradle ]; then
+            sed -i 's/minifyEnabled[[:space:]]*true/minifyEnabled false/g' android/app/build.gradle
+            sed -i 's/shrinkResources[[:space:]]*true/shrinkResources false/g' android/app/build.gradle
+          fi
+
+          if [ -f android/app/build.gradle.kts ]; then
+            sed -i 's/isMinifyEnabled[[:space:]]*=[[:space:]]*true/isMinifyEnabled = false/g' android/app/build.gradle.kts
+            sed -i 's/isShrinkResources[[:space:]]*=[[:space:]]*true/isShrinkResources = false/g' android/app/build.gradle.kts
+          fi
+
+          echo "R8/minification disabled."
+
       - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: flutter build apk --release --no-shrink
