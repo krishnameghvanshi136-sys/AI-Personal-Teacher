@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -33,30 +32,7 @@ jobs:
 
       - name: Add Internet permission
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          manifest = Path(
-              "app/android/app/src/main/AndroidManifest.xml"
-          )
-
-          text = manifest.read_text()
-
-          permission = (
-              '<uses-permission '
-              'android:name="android.permission.INTERNET"/>'
-          )
-
-          if permission not in text:
-              text = text.replace(
-                  '<manifest ',
-                  '<manifest ' + permission,
-                  1
-              )
-              manifest.write_text(text)
-
-          print("Internet permission added successfully.")
-          PY
+          sed -i '/<manifest /a\    <uses-permission android:name="android.permission.INTERNET"/>' app/android/app/src/main/AndroidManifest.xml
 
       - name: Get dependencies
         working-directory: app
@@ -64,23 +40,7 @@ jobs:
 
       - name: Build APK
         working-directory: app
-        run: |
-          flutter build apk --release \
-            --dart-define=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AI-Personal-Teacher-APK
-          path: app/build/app/outputs/flutter-apk/app-release.apk      - name: Get dependencies
-        working-directory: app
-        run: flutter pub get
-
-      - name: Build APK
-        working-directory: app
-        run: |
-          flutter build apk --release \
-            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+        run: flutter build apk --release --dart-define=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
