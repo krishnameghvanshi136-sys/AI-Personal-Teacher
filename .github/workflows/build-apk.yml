@@ -2,15 +2,16 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -23,7 +24,7 @@ jobs:
         run: |
           rm -rf app
           flutter create --platforms=android app
-              cp pubspec.yaml app/pubspec.yaml
+          cp pubspec.yaml app/pubspec.yaml
 
       - name: Copy app source
         run: |
@@ -36,7 +37,9 @@ jobs:
 
       - name: Build APK
         working-directory: app
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
