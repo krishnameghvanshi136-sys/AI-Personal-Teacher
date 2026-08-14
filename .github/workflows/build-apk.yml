@@ -12,46 +12,51 @@ jobs:
 
     steps:
 
-      # ==============================
+      # ==========================================
       # 1. CHECKOUT
-      # ==============================
+      # ==========================================
       - name: Checkout repository
         uses: actions/checkout@v4
 
 
-      # ==============================
+      # ==========================================
       # 2. SETUP FLUTTER
-      # ==============================
+      # ==========================================
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: stable
           channel: stable
           cache: true
 
 
-      # ==============================
+      # ==========================================
       # 3. CHECK FLUTTER
-      # ==============================
+      # ==========================================
       - name: Check Flutter
         run: |
           flutter --version
           dart --version
 
 
-      # ==============================
-      # 4. CHECK SOURCE
-      # ==============================
+      # ==========================================
+      # 4. CHECK PROJECT
+      # ==========================================
       - name: Check AI Personal Teacher source
         run: |
+          set -e
+
+          echo "Checking project files..."
+
           test -f pubspec.yaml
           test -f lib/main.dart
-          echo "Source files found."
+
+          echo "pubspec.yaml found"
+          echo "lib/main.dart found"
 
 
-      # ==============================
-      # 5. CREATE / REPAIR ANDROID
-      # ==============================
+      # ==========================================
+      # 5. CREATE / REPAIR ANDROID PROJECT
+      # ==========================================
       - name: Configure Android project
         run: |
           set -e
@@ -63,32 +68,36 @@ jobs:
             --project-name=ai_personal_teacher \
             .
 
-          echo "Checking Android files..."
+          echo "Checking Android Gradle files..."
 
           if [ -f android/app/build.gradle ]; then
-            echo "build.gradle found"
+            echo "android/app/build.gradle found"
           elif [ -f android/app/build.gradle.kts ]; then
-            echo "build.gradle.kts found"
+            echo "android/app/build.gradle.kts found"
           else
-            echo "Android Gradle file missing"
+            echo "ERROR: Android Gradle file not found"
             exit 1
           fi
 
           echo "Android project ready."
 
 
-      # ==============================
-      # 6. REMOVE DEFAULT FLUTTER TEST
-      # ==============================
+      # ==========================================
+      # 6. REMOVE DEFAULT TEST
+      # ==========================================
       - name: Remove default Flutter test
         run: |
-          rm -rf test
-          echo "Default Flutter test removed."
+          if [ -d "test" ]; then
+            rm -rf test
+            echo "Default test folder removed."
+          else
+            echo "No test folder found."
+          fi
 
 
-      # ==============================
+      # ==========================================
       # 7. ANDROID PERMISSIONS
-      # ==============================
+      # ==========================================
       - name: Configure Android permissions
         run: |
           set -e
@@ -110,85 +119,4 @@ jobs:
 
           additions = []
 
-          for permission in permissions:
-              line = f'<uses-permission android:name="{permission}"/>'
-
-              if line not in text:
-                  additions.append("    " + line)
-
-          if additions:
-              marker_end = text.find(">")
-
-              if marker_end == -1:
-                  raise SystemExit("Invalid AndroidManifest.xml")
-
-              text = (
-                  text[:marker_end + 1]
-                  + "\n"
-                  + "\n".join(additions)
-                  + "\n"
-                  + text[marker_end + 1:]
-              )
-
-              path.write_text(text, encoding="utf-8")
-
-          print("Android permissions configured.")
-          PY
-
-
-      # ==============================
-      # 8. GET DEPENDENCIES
-      # ==============================
-      - name: Get dependencies
-        run: |
-          flutter clean
-          flutter pub get
-
-
-      # ==============================
-      # 9. ANALYZE FLUTTER PROJECT
-      # ==============================
-      - name: Analyze Flutter project
-        run: |
-          flutter analyze --no-fatal-infos
-
-
-      # ==============================
-      # 10. BUILD RELEASE APK
-      # ==============================
-      - name: Build Release APK
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          set -e
-
-          echo "Building APK..."
-
-          flutter build apk \
-            --release \
-            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
-
-          echo "APK build successful."
-
-          ls -lh build/app/outputs/flutter-apk/
-
-
-      # ==============================
-      # 11. UPLOAD APK
-      # ==============================
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AI-Personal-Teacher-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
-
-
-      # ==============================
-      # 12. COMPLETE
-      # ==============================
-      - name: Build completed
-        run: |
-          echo "======================================"
-          echo "AI PERSONAL TEACHER APK READY"
-          echo "======================================"
+          for permission in permissions
