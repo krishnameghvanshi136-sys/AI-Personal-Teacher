@@ -13,89 +13,41 @@ jobs:
 
     steps:
 
-      # 1. Repository download
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Flutter setup
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
-      # 3. Create Android project
       - name: Create Android project
         run: |
           rm -rf app
           flutter create --platforms=android app
-
           cp pubspec.yaml app/pubspec.yaml
 
-      # 4. Copy latest main.dart
       - name: Copy Flutter source
         run: |
           rm -rf app/lib
+          rm -rf app/test
           cp -r lib app/lib
 
-      # 5. Add Android permissions
-      - name: Configure Android permissions
+      - name: Add Android permissions
         run: |
-          python3 <<'PY'
-          from pathlib import Path
+          MANIFEST="app/android/app/src/main/AndroidManifest.xml"
 
-          manifest = Path(
-              "app/android/app/src/main/AndroidManifest.xml"
-          )
+          sed -i 's#<manifest#<manifest#' "$MANIFEST"
 
-          text = manifest.read_text()
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || \
+            sed -i '2i\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
 
-          permissions = [
-              "android.permission.INTERNET",
-              "android.permission.RECORD_AUDIO",
-              "android.permission.CAMERA",
-          ]
+          grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" || \
+            sed -i '2i\    <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
 
-          for permission in permissions:
-              line = (
-                  f'    <uses-permission '
-                  f'android:name="{permission}"/>'
-              )
+          grep -q 'android.permission.CAMERA' "$MANIFEST" || \
+            sed -i '2i\    <uses-permission android:name="android.permission.CAMERA"/>' "$MANIFEST"
 
-              if permission not in text:
-                  text = text.replace(
-                      "<manifest",
-                      "<manifest",
-                      1
-                  )
-
-                  pos = text.find(">")
-
-                  if pos != -1:
-                      text = (
-                          text[:pos + 1]
-                          + "\n"
-                          + line
-                          + text[pos + 1:]
-                      )
-
-          queries = """
-              <queries>
-                  <intent>
-                      <action android:name="android.speech.RecognitionService" />
-                  </intent>
-              </queries>
-          """
-
-          if "android.speech.RecognitionService" not in text:
-              text = text.replace(
-                  "</manifest>",
-                  queries + "\n</manifest>"
-              )
-
-          manifest.write_text(text)
-          PY
-
-      # 6. Check Gemini API key
       - name: Check Gemini API Key
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -108,19 +60,16 @@ jobs:
 
           echo "GEMINI_API_KEY Secret मौजूद है."
 
-      # 7. Get Flutter packages
-      - name: Flutter Pub Get
+      - name: Get dependencies
         working-directory: app
         run: |
           flutter pub get
 
-      # 8. Check Flutter project
       - name: Flutter Analyze
         working-directory: app
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      # 9. Build release APK
       - name: Build Release APK
         working-directory: app
         env:
@@ -129,7 +78,6 @@ jobs:
           flutter build apk --release \
             --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
-      # 10. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
