@@ -13,13 +13,13 @@ jobs:
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.0
           channel: stable
+          flutter-version: 3.47.0
           cache: true
 
       - name: Check Flutter
@@ -27,26 +27,61 @@ jobs:
           flutter --version
           dart --version
 
-      - name: Check project files
+      - name: Check Flutter source
         run: |
           test -f pubspec.yaml
           test -f lib/main.dart
+          echo "Flutter source files OK"
+
+      - name: Create Android project if missing
+        run: |
+          if [ ! -f android/app/build.gradle.kts ]; then
+            echo "Android project missing."
+            echo "Creating Android project..."
+            flutter create . --platforms android
+          else
+            echo "Android project already exists."
+          fi
+
+      - name: Check Android project
+        run: |
           test -f android/app/build.gradle.kts
           test -f android/app/src/main/AndroidManifest.xml
-          echo "Project files OK"
+          echo "Android project OK"
 
       - name: Configure Android permissions
-        shell: bash
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          python3 - <<'PY'
+          from pathlib import Path
 
-          grep -q 'android.permission.INTERNET' "$MANIFEST" || \
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+          manifest = Path(
+              "android/app/src/main/AndroidManifest.xml"
+          )
 
-          grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" || \
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
+          text = manifest.read_text()
 
-          echo "Android permissions configured"
+          permissions = [
+              'android.permission.INTERNET',
+              'android.permission.RECORD_AUDIO',
+          ]
+
+          for permission in permissions:
+              line = f'    <uses-permission android:name="{permission}"/>'
+
+              if permission not in text:
+                  text = text.replace(
+                      '<manifest',
+                      '<manifest',
+                      1
+                  )
+
+                  pos = text.find('>') + 1
+                  text = text[:pos] + '\n' + line + text[pos:]
+
+          manifest.write_text(text)
+
+          print("Android permissions configured.")
+          PY
 
       - name: Get dependencies
         run: |
@@ -78,6 +113,6 @@ jobs:
 
       - name: Build completed
         run: |
-          echo "======================================"
+          echo "================================"
           echo "AI PERSONAL TEACHER APK READY"
-          echo "======================================"
+          echo "================================"
