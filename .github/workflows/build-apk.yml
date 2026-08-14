@@ -20,16 +20,24 @@ jobs:
         with:
           channel: stable
 
-      - name: Check project files
+      - name: Check AI Personal Teacher source
         run: |
-          echo "Project files:"
+          echo "Current project:"
+          pwd
+          echo "Files:"
           ls -la
           echo "Checking main.dart:"
-          ls -la lib/main.dart
+          test -f lib/main.dart
+          echo "main.dart found successfully."
 
       - name: Configure Android project
         run: |
           flutter create --platforms=android .
+
+      - name: Remove default Flutter test
+        run: |
+          rm -rf test
+          echo "Default Flutter test removed."
 
       - name: Configure Android permissions
         shell: bash
@@ -38,6 +46,10 @@ jobs:
           from pathlib import Path
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
+
+          if not manifest.exists():
+              raise SystemExit("AndroidManifest.xml not found")
+
           text = manifest.read_text()
 
           permissions = [
@@ -98,6 +110,11 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "ERROR: GEMINI_API_KEY secret is missing."
+            exit 1
+          fi
+
           flutter build apk --release \
             --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
