@@ -39,6 +39,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           manifest = Path(
               "app/android/app/src/main/AndroidManifest.xml"
@@ -46,13 +47,17 @@ jobs:
 
           text = manifest.read_text()
 
-          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+          permission = (
+              '<uses-permission '
+              'android:name="android.permission.INTERNET"/>'
+          )
 
           if permission not in text:
-              text = text.replace(
-                  '<manifest',
-                  '<manifest\n    ' + permission,
-                  1
+              text = re.sub(
+                  r'(<manifest\b[^>]*>)',
+                  r'\1\n    ' + permission,
+                  text,
+                  count=1
               )
 
           manifest.write_text(text)
