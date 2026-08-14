@@ -20,7 +20,6 @@ class AIPersonalTeacherApp extends StatelessWidget {
       title: 'AI Personal Teacher',
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'sans',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF673AB7),
         ),
@@ -59,10 +58,8 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     'GEMINI_API_KEY',
   );
 
-  // Current stable Gemini model.
-  // If your API key does not have access, we will check that
-  // separately after the Flutter build is working.
-  static const String modelName = 'gemini-3.5-flash';
+  // Gemini 2.5 Flash
+  static const String modelName = 'gemini-2.5-flash';
 
   GenerativeModel? _model;
   ChatSession? _chat;
@@ -97,7 +94,6 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
 
   String _selectedClass = 'कक्षा 5';
   String _selectedSubject = 'गणित';
-
   String _selectedTopic = '';
 
   Uint8List? _selectedImage;
@@ -105,7 +101,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   final List<ChatMessage> _messages = [];
 
   // ============================================================
-  // CLASS LIST
+  // CLASSES
   // ============================================================
 
   final List<String> _classes = const [
@@ -122,6 +118,10 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     'कक्षा 11',
     'कक्षा 12',
   ];
+
+  // ============================================================
+  // SUBJECTS
+  // ============================================================
 
   final List<String> _subjects = const [
     'गणित',
@@ -148,6 +148,10 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     _initializeTts();
   }
 
+  // ============================================================
+  // GEMINI INITIALIZATION
+  // ============================================================
+
   void _initializeGemini() {
     if (apiKey.trim().isEmpty) {
       return;
@@ -160,35 +164,239 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
         '''
 आप "AI Personal Teacher" नाम के एक डिजिटल शिक्षक हैं।
 
-आपका काम विद्यार्थी को उसकी कक्षा और विषय के अनुसार पढ़ाना है।
+आपका मुख्य काम बच्चों को उनकी कक्षा, विषय और चुने हुए topic के अनुसार पढ़ाना है।
 
-नियम:
+==============================
+STUDENT LEVEL
+==============================
 
-1. विद्यार्थी की भाषा को समझें।
-2. अगर विद्यार्थी हिंदी में पूछे तो हिंदी में उत्तर दें।
-3. अगर विद्यार्थी Hinglish में पूछे तो आसान Hinglish/Hindi में उत्तर दें।
-4. अगर विद्यार्थी English में पूछे तो English में उत्तर दें।
-5. बहुत कठिन भाषा का उपयोग न करें।
-6. पहले सीधा उत्तर दें।
-7. जरूरत होने पर step-by-step explanation दें।
-8. गणित में calculation साफ तरीके से दिखाएँ।
-9. विज्ञान में उदाहरण देकर समझाएँ।
-10. इतिहास और सामाजिक विज्ञान में तथ्य स्पष्ट रखें।
-11. विद्यार्थी की कक्षा के स्तर से ज्यादा कठिन उत्तर न दें।
-12. विद्यार्थी अगर "समझाओ" कहे तो शिक्षक की तरह धीरे-धीरे समझाएँ।
-13. विद्यार्थी अगर अभ्यास प्रश्न माँगे तो प्रश्न दें और जरूरत पड़ने पर उत्तर बाद में दें।
-14. विद्यार्थी अगर परीक्षा की तैयारी करे तो महत्वपूर्ण points और संभावित प्रश्न दें।
-15. विद्यार्थी अगर सिर्फ सामान्य सवाल पूछे तो भी मदद करें।
-16. गलत उत्तर मिलने पर विनम्रता से सही उत्तर समझाएँ।
-17. कभी भी यह न कहें कि आप सिर्फ AI हैं और इसलिए मदद नहीं कर सकते।
-18. उत्तर अनावश्यक रूप से बहुत लंबा न करें।
-19. हर उत्तर विद्यार्थी के लिए उपयोगी और पढ़ने में आसान होना चाहिए।
-        ''',
+हर जवाब विद्यार्थी की चुनी हुई कक्षा के स्तर के अनुसार होना चाहिए।
+
+कक्षा छोटी है तो:
+- बहुत आसान भाषा इस्तेमाल करें।
+- छोटे वाक्यों का उपयोग करें।
+- आसान उदाहरण दें।
+- कठिन शब्दों का अर्थ समझाएँ।
+
+कक्षा बड़ी है तो:
+- विषय के अनुसार थोड़ा विस्तृत उत्तर दे सकते हैं।
+- लेकिन अनावश्यक कठिन भाषा का उपयोग न करें।
+
+==============================
+LANGUAGE RULE
+==============================
+
+विद्यार्थी जिस भाषा में सवाल पूछता है उसी भाषा में उत्तर दें।
+
+अगर सवाल Hindi में है:
+Hindi में जवाब दें।
+
+अगर सवाल Hinglish में है:
+आसान Hindi/Hinglish में जवाब दें।
+
+अगर सवाल English में है:
+English में जवाब दें।
+
+==============================
+ANSWER RULE
+==============================
+
+सबसे पहले विद्यार्थी के सवाल का सीधा उत्तर दें।
+
+अगर सवाल बहुत छोटा है तो छोटा और सीधा उत्तर दें।
+
+अगर विद्यार्थी "समझाओ", "कैसे", "क्यों", "पूरा समझाओ" आदि पूछता है:
+तब step-by-step समझाएँ।
+
+गणित के सवाल में:
+1. दिए गए तथ्य बताएं।
+2. Formula या calculation बताएं।
+3. Calculation करें।
+4. अंतिम उत्तर साफ लिखें।
+
+उदाहरण:
+
+दूरी = 100 किलोमीटर
+समय = 1 घंटा
+
+चाल = दूरी ÷ समय
+चाल = 100 ÷ 1
+चाल = 100 किलोमीटर प्रति घंटा
+
+उत्तर: 100 किलोमीटर प्रति घंटा
+
+==============================
+STUDY MODE
+==============================
+
+जब Study Mode ON हो:
+
+विद्यार्थी को शिक्षक की तरह पढ़ाएँ।
+
+अगर विद्यार्थी किसी concept के बारे में पूछता है:
+1. आसान भाषा में concept समझाएँ।
+2. एक आसान उदाहरण दें।
+3. जरूरत हो तो छोटा अभ्यास प्रश्न दें।
+
+लेकिन हर जवाब के अंत में जबरदस्ती नया सवाल न पूछें।
+
+अगर विद्यार्थी सिर्फ factual question पूछता है,
+तो सिर्फ उसका सही उत्तर दें।
+
+==============================
+CLASS + SUBJECT
+==============================
+
+हमेशा इन तीन चीजों को ध्यान में रखें:
+
+कक्षा
+विषय
+अध्याय / Topic
+
+उदाहरण:
+
+कक्षा: कक्षा 5
+विषय: गणित
+Topic: भिन्न
+
+तो उत्तर कक्षा 5 के स्तर का होना चाहिए।
+
+==============================
+GENERAL QUESTIONS
+==============================
+
+अगर विद्यार्थी Study Mode में है लेकिन सामान्य जानकारी का सवाल पूछता है,
+तो सवाल का सही और सरल उत्तर दें।
+
+उदाहरण:
+
+विद्यार्थी:
+भारत की राजधानी क्या है?
+
+उत्तर:
+भारत की राजधानी नई दिल्ली है।
+
+बस जरूरत से ज्यादा explanation न दें।
+
+==============================
+IMAGE QUESTIONS
+==============================
+
+अगर विद्यार्थी image भेजता है:
+
+Image को ध्यान से देखकर जवाब दें।
+
+अगर image में homework या question है:
+उसे पढ़कर आसान तरीके से हल करें।
+
+अगर image साफ नहीं है:
+विद्यार्थी को बताएं कि image साफ नहीं दिखाई दे रही है।
+
+==============================
+IMPORTANT SAFETY
+==============================
+
+अगर विद्यार्थी गलत उत्तर देता है:
+उसे डांटें नहीं।
+
+कहें:
+"कोई बात नहीं, इसे एक बार सही तरीके से समझते हैं।"
+
+==============================
+VERY IMPORTANT FORMATTING RULE
+==============================
+
+उत्तर में Markdown formatting का उपयोग न करें।
+
+इनका उपयोग बिल्कुल न करें:
+
+**
+***
+###
+##
+$
+$$
+\\div
+\\frac
+
+LaTeX mathematics न लिखें।
+
+इसके बजाय सामान्य text और symbols इस्तेमाल करें:
+
+÷
+×
+=
++
+−
+
+उदाहरण:
+
+गलत:
+$2500 \\div 25$
+
+सही:
+2500 ÷ 25 = 100
+
+गलत:
+**उत्तर: 100**
+
+सही:
+उत्तर: 100
+
+गलत:
+### उत्तर
+
+सही:
+उत्तर
+
+==============================
+NO META TALK
+==============================
+
+कभी भी यह न लिखें:
+
+"उत्तर आएगा"
+"अब आपकी बारी"
+"क्या आप इसका उत्तर बता सकते हैं?"
+"चलो एक challenge करते हैं"
+
+जब तक विद्यार्थी खुद अभ्यास प्रश्न न मांगे,
+बिना जरूरत नया सवाल न बनाएं।
+
+विद्यार्थी ने जो पूछा है उसी का उत्तर दें।
+
+==============================
+NO AI META
+==============================
+
+अपने बारे में यह न कहें कि:
+"मैं AI हूँ इसलिए..."
+
+सीधे शिक्षक की तरह मदद करें।
+
+==============================
+FINAL QUALITY RULE
+==============================
+
+हर उत्तर:
+
+सही
+स्पष्ट
+कक्षा के अनुसार
+विषय के अनुसार
+सरल
+और विद्यार्थी के लिए उपयोगी होना चाहिए।
+
+''',
       ),
     );
 
     _chat = _model!.startChat();
   }
+
+  // ============================================================
+  // SPEECH
+  // ============================================================
 
   Future<void> _initializeSpeech() async {
     try {
@@ -208,10 +416,6 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
           setState(() {
             _listening = false;
           });
-
-          _showMessage(
-            'Mic में समस्या हुई। Microphone permission check करें।',
-          );
         },
       );
 
@@ -229,6 +433,10 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     }
   }
 
+  // ============================================================
+  // TTS
+  // ============================================================
+
   Future<void> _initializeTts() async {
     try {
       await _tts.setSpeechRate(0.48);
@@ -239,31 +447,78 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   }
 
   // ============================================================
-  // STUDY PROMPT
+  // TEACHER CONTEXT
   // ============================================================
 
   String _teacherContext() {
     final topic = _selectedTopic.trim();
 
     return '''
-विद्यार्थी की जानकारी:
+वर्तमान विद्यार्थी:
 
 कक्षा: $_selectedClass
 विषय: $_selectedSubject
 अध्याय/Topic: ${topic.isEmpty ? 'कोई विशेष topic नहीं चुना गया' : topic}
+Study Mode: ${_studyMode ? 'ON' : 'OFF'}
 
-अगर Study Mode ON है:
-- विद्यार्थी को शिक्षक की तरह पढ़ाएँ।
-- पहले concept समझाएँ।
-- फिर छोटा उदाहरण दें।
-- अंत में अभ्यास प्रश्न दें।
-- जरूरत हो तो विद्यार्थी से एक छोटा सवाल पूछें।
-
-अगर Study Mode OFF है:
-- सामान्य chat teacher की तरह उत्तर दें।
-
-उत्तर विद्यार्थी की कक्षा के स्तर के अनुसार रखें।
+इस विद्यार्थी के जवाब में ऊपर दी गई जानकारी को ध्यान में रखें।
 ''';
+  }
+
+  // ============================================================
+  // CLEAN GEMINI RESPONSE
+  // ============================================================
+
+  String _cleanAnswer(String text) {
+    String answer = text.trim();
+
+    // Markdown हटाएँ
+    answer = answer.replaceAll('###', '');
+    answer = answer.replaceAll('##', '');
+    answer = answer.replaceAll('#', '');
+
+    answer = answer.replaceAll('***', '');
+    answer = answer.replaceAll('**', '');
+    answer = answer.replaceAll('__', '');
+
+    // Dollar math markers
+    answer = answer.replaceAll('$$', '');
+    answer = answer.replaceAll('\$', '');
+
+    // Common LaTeX
+    answer = answer.replaceAll(r'\div', '÷');
+    answer = answer.replaceAll(r'\times', '×');
+    answer = answer.replaceAll(r'\cdot', '×');
+    answer = answer.replaceAll(r'\pm', '±');
+    answer = answer.replaceAll(r'\geq', '≥');
+    answer = answer.replaceAll(r'\leq', '≤');
+
+    // Common escaped slash
+    answer = answer.replaceAll(r'\(', '');
+    answer = answer.replaceAll(r'\)', '');
+    answer = answer.replaceAll(r'\[', '');
+    answer = answer.replaceAll(r'\]', '');
+
+    // कुछ unwanted meta phrases
+    answer = answer.replaceAll(
+      'उत्तर आएगा:',
+      '',
+    );
+
+    answer = answer.replaceAll(
+      'अब आपकी बारी:',
+      '',
+    );
+
+    answer = answer.replaceAll(
+      'अब आपकी बारी',
+      '',
+    );
+
+    // Extra blank lines
+    answer = answer.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+
+    return answer.trim();
   }
 
   // ============================================================
@@ -289,7 +544,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     }
 
     final String finalQuestion = question.isEmpty
-        ? 'इस image को देखकर विद्यार्थी को आसान भाषा में समझाइए।'
+        ? 'इस image में दिए गए सवाल को देखकर आसान भाषा में हल करें।'
         : question;
 
     final imageForMessage = _selectedImage;
@@ -317,6 +572,18 @@ ${_teacherContext()}
 विद्यार्थी का सवाल:
 
 $finalQuestion
+
+अब सिर्फ विद्यार्थी के सवाल का उपयोगी उत्तर दें।
+
+उत्तर:
+- सरल रखें।
+- चुनी हुई कक्षा के स्तर का रखें।
+- सीधे सवाल का जवाब दें।
+- जरूरत होने पर step-by-step समझाएँ।
+- Markdown या LaTeX का उपयोग न करें।
+- $ या ** या ### का उपयोग न करें।
+- बिना जरूरत नया सवाल न पूछें।
+- बिना जरूरत motivational speech न दें।
 ''';
 
       GenerateContentResponse response;
@@ -337,24 +604,27 @@ $finalQuestion
         );
       }
 
-      final answer = response.text?.trim();
+      final rawAnswer = response.text?.trim();
 
       if (!mounted) return;
 
-      if (answer == null || answer.isEmpty) {
+      if (rawAnswer == null || rawAnswer.isEmpty) {
         setState(() {
           _messages.add(
             ChatMessage(
-              text: 'अभी जवाब नहीं मिल पाया। कृपया दोबारा कोशिश करें।',
+              text:
+                  'अभी जवाब नहीं मिल पाया। कृपया दोबारा कोशिश करें।',
               isUser: false,
             ),
           );
         });
       } else {
+        final cleanAnswer = _cleanAnswer(rawAnswer);
+
         setState(() {
           _messages.add(
             ChatMessage(
-              text: answer,
+              text: cleanAnswer,
               isUser: false,
             ),
           );
@@ -390,24 +660,25 @@ $finalQuestion
     final message = error.toString();
 
     if (message.contains('InvalidApiKey') ||
-        message.contains('API key')) {
+        message.contains('API key') ||
+        message.contains('401')) {
       return '''
 ❌ Gemini API key में समस्या है।
 
-API key check करें और फिर दोबारा कोशिश करें।
+API key check करें।
 ''';
     }
 
     if (message.contains('404') ||
-        message.contains('not found') ||
-        message.contains('NOT_FOUND')) {
+        message.contains('NOT_FOUND') ||
+        message.contains('not found')) {
       return '''
 ❌ Gemini model उपलब्ध नहीं है।
 
-अभी इस्तेमाल हो रहा model:
-$modelName
+Model:
+gemini-2.5-flash
 
-API key के लिए उपलब्ध model बाद में check करेंगे।
+Google AI API key और model access check करें।
 ''';
     }
 
@@ -416,7 +687,7 @@ API key के लिए उपलब्ध model बाद में check क�
       return '''
 ⚠️ Gemini API की request limit पूरी हो गई है।
 
-थोड़ी देर बाद दोबारा कोशिश करें।
+कुछ समय बाद दोबारा कोशिश करें।
 ''';
     }
 
@@ -434,9 +705,6 @@ Internet ON करके दोबारा कोशिश करें।
 ❌ जवाब नहीं मिल पाया।
 
 Internet connection और Gemini API key check करें।
-
-Error:
-$message
 ''';
   }
 
@@ -491,11 +759,14 @@ $message
           if (!mounted) return;
 
           setState(() {
-            _textController.text = result.recognizedWords;
+            _textController.text =
+                result.recognizedWords;
+
             _textController.selection =
                 TextSelection.fromPosition(
               TextPosition(
-                offset: _textController.text.length,
+                offset:
+                    _textController.text.length,
               ),
             );
           });
@@ -599,6 +870,22 @@ $message
   }
 
   // ============================================================
+  // RESET CHAT WHEN CLASS/SUBJECT CHANGES
+  // ============================================================
+
+  void _restartChatOnly() {
+    if (_model != null) {
+      _chat = _model!.startChat();
+    }
+
+    if (_messages.isNotEmpty) {
+      setState(() {
+        _messages.clear();
+      });
+    }
+  }
+
+  // ============================================================
   // TOPIC
   // ============================================================
 
@@ -615,7 +902,8 @@ $message
             controller: controller,
             autofocus: true,
             decoration: const InputDecoration(
-              hintText: 'जैसे: भिन्न, प्रकाश, grammar...',
+              hintText:
+                  'जैसे: भिन्न, प्रकाश, grammar...',
               border: OutlineInputBorder(),
             ),
           ),
@@ -647,6 +935,8 @@ $message
     setState(() {
       _selectedTopic = result;
     });
+
+    _restartChatOnly();
   }
 
   // ============================================================
@@ -695,7 +985,12 @@ $message
   Widget _buildStudyPanel() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      margin: const EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        8,
+      ),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -715,7 +1010,8 @@ $message
                 height: 52,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius:
+                      BorderRadius.circular(18),
                 ),
                 child: const Icon(
                   Icons.menu_book_rounded,
@@ -739,6 +1035,8 @@ $message
                   setState(() {
                     _studyMode = value;
                   });
+
+                  _restartChatOnly();
                 },
               ),
             ],
@@ -756,6 +1054,8 @@ $message
                   setState(() {
                     _selectedClass = value;
                   });
+
+                  _restartChatOnly();
                 },
               ),
               const SizedBox(width: 12),
@@ -769,6 +1069,8 @@ $message
                   setState(() {
                     _selectedSubject = value;
                   });
+
+                  _restartChatOnly();
                 },
               ),
             ],
@@ -785,7 +1087,8 @@ $message
               ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(20),
               ),
               child: Row(
                 children: [
@@ -802,13 +1105,16 @@ $message
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
-                        color: _selectedTopic.isEmpty
-                            ? Colors.grey.shade700
-                            : Colors.black87,
+                        color:
+                            _selectedTopic.isEmpty
+                                ? Colors.grey.shade700
+                                : Colors.black87,
                       ),
                     ),
                   ),
-                  const Icon(Icons.edit_outlined),
+                  const Icon(
+                    Icons.edit_outlined,
+                  ),
                 ],
               ),
             ),
@@ -819,18 +1125,20 @@ $message
   }
 
   // ============================================================
-  // MESSAGE BUBBLE
+  // MESSAGE
   // ============================================================
 
   Widget _buildMessage(ChatMessage message) {
     final isUser = message.isUser;
 
     return Align(
-      alignment:
-          isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isUser
+          ? Alignment.centerRight
+          : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.88,
+          maxWidth:
+              MediaQuery.of(context).size.width * 0.88,
         ),
         margin: const EdgeInsets.symmetric(
           horizontal: 16,
@@ -842,8 +1150,10 @@ $message
               ? const Color(0xFFE3CCFF)
               : Colors.white,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(22),
-            topRight: const Radius.circular(22),
+            topLeft:
+                const Radius.circular(22),
+            topRight:
+                const Radius.circular(22),
             bottomLeft: Radius.circular(
               isUser ? 22 : 5,
             ),
@@ -854,7 +1164,8 @@ $message
           boxShadow: [
             BoxShadow(
               blurRadius: 12,
-              offset: const Offset(0, 4),
+              offset:
+                  const Offset(0, 4),
               color: Colors.black.withValues(
                 alpha: 0.06,
               ),
@@ -862,7 +1173,8 @@ $message
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -884,7 +1196,8 @@ $message
                 Text(
                   isUser ? 'आप' : 'Teacher',
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                        FontWeight.w800,
                     fontSize: 17,
                   ),
                 ),
@@ -893,7 +1206,8 @@ $message
             if (message.imageBytes != null) ...[
               const SizedBox(height: 12),
               ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius:
+                    BorderRadius.circular(16),
                 child: Image.memory(
                   message.imageBytes!,
                   width: double.infinity,
@@ -913,14 +1227,16 @@ $message
             if (!isUser) ...[
               const SizedBox(height: 8),
               Align(
-                alignment: Alignment.centerRight,
+                alignment:
+                    Alignment.centerRight,
                 child: IconButton(
-                  onPressed: () => _speak(message.text),
+                  onPressed: () =>
+                      _speak(message.text),
                   icon: const Icon(
                     Icons.volume_up_rounded,
-                    color: Color(0xFF673AB7),
+                    color:
+                        Color(0xFF673AB7),
                   ),
-                  tooltip: 'सुनें',
                 ),
               ),
             ],
@@ -939,19 +1255,23 @@ $message
       child: Padding(
         padding: const EdgeInsets.all(30),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+              MainAxisAlignment.center,
           children: [
             Container(
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: const Color(0xFFE9D8FF),
-                borderRadius: BorderRadius.circular(28),
+                color:
+                    const Color(0xFFE9D8FF),
+                borderRadius:
+                    BorderRadius.circular(28),
               ),
               child: const Icon(
                 Icons.school_rounded,
                 size: 52,
-                color: Color(0xFF673AB7),
+                color:
+                    Color(0xFF673AB7),
               ),
             ),
             const SizedBox(height: 20),
@@ -959,18 +1279,21 @@ $message
               'नमस्ते! 👋',
               style: TextStyle(
                 fontSize: 28,
-                fontWeight: FontWeight.w800,
+                fontWeight:
+                    FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'मैं आपका digital teacher हूँ।\n'
               'कोई भी सवाल पूछिए।',
-              textAlign: TextAlign.center,
+              textAlign:
+                  TextAlign.center,
               style: TextStyle(
                 fontSize: 17,
                 height: 1.5,
-                color: Colors.grey.shade700,
+                color:
+                    Colors.grey.shade700,
               ),
             ),
           ],
@@ -980,7 +1303,7 @@ $message
   }
 
   // ============================================================
-  // INPUT AREA
+  // INPUT
   // ============================================================
 
   Widget _buildInputArea() {
@@ -998,7 +1321,8 @@ $message
           boxShadow: [
             BoxShadow(
               blurRadius: 14,
-              offset: const Offset(0, -4),
+              offset:
+                  const Offset(0, -4),
               color: Colors.black.withValues(
                 alpha: 0.06,
               ),
@@ -1009,7 +1333,8 @@ $message
           children: [
             if (_selectedImage != null)
               Container(
-                margin: const EdgeInsets.only(
+                margin:
+                    const EdgeInsets.only(
                   bottom: 8,
                 ),
                 height: 80,
@@ -1017,7 +1342,9 @@ $message
                   children: [
                     ClipRRect(
                       borderRadius:
-                          BorderRadius.circular(14),
+                          BorderRadius.circular(
+                        14,
+                      ),
                       child: Image.memory(
                         _selectedImage!,
                         width: 80,
@@ -1031,13 +1358,17 @@ $message
                       child: IconButton(
                         onPressed: () {
                           setState(() {
-                            _selectedImage = null;
+                            _selectedImage =
+                                null;
                           });
                         },
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white,
+                        style:
+                            IconButton.styleFrom(
+                          backgroundColor:
+                              Colors.white,
                         ),
-                        icon: const Icon(
+                        icon:
+                            const Icon(
                           Icons.close,
                         ),
                       ),
@@ -1051,34 +1382,51 @@ $message
               children: [
                 IconButton(
                   onPressed:
-                      _loading ? null : _pickImage,
-                  icon: const Icon(
-                    Icons.add_a_photo_outlined,
+                      _loading
+                          ? null
+                          : _pickImage,
+                  icon:
+                      const Icon(
+                    Icons
+                        .add_a_photo_outlined,
                     size: 30,
-                    color: Color(0xFF673AB7),
+                    color:
+                        Color(0xFF673AB7),
                   ),
                 ),
                 Expanded(
                   child: TextField(
-                    controller: _textController,
+                    controller:
+                        _textController,
                     minLines: 1,
                     maxLines: 5,
                     textInputAction:
-                        TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: _listening
-                          ? '🎤 सुन रहा हूँ...'
-                          : 'अपना सवाल लिखें...',
+                        TextInputAction
+                            .newline,
+                    decoration:
+                        InputDecoration(
+                      hintText:
+                          _listening
+                              ? '🎤 सुन रहा हूँ...'
+                              : 'अपना सवाल लिखें...',
                       filled: true,
                       fillColor:
-                          const Color(0xFFF2EDFA),
-                      border: OutlineInputBorder(
+                          const Color(
+                        0xFFF2EDFA,
+                      ),
+                      border:
+                          OutlineInputBorder(
                         borderRadius:
-                            BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
+                            BorderRadius
+                                .circular(
+                          25,
+                        ),
+                        borderSide:
+                            BorderSide.none,
                       ),
                       contentPadding:
-                          const EdgeInsets.symmetric(
+                          const EdgeInsets
+                              .symmetric(
                         horizontal: 18,
                         vertical: 14,
                       ),
@@ -1088,26 +1436,35 @@ $message
                 const SizedBox(width: 4),
                 IconButton(
                   onPressed:
-                      _loading ? null : _toggleListening,
+                      _loading
+                          ? null
+                          : _toggleListening,
                   icon: Icon(
                     _listening
-                        ? Icons.stop_circle_rounded
+                        ? Icons
+                            .stop_circle_rounded
                         : Icons.mic_rounded,
                     size: 31,
                     color: _listening
                         ? Colors.red
-                        : const Color(0xFF673AB7),
+                        : const Color(
+                            0xFF673AB7,
+                          ),
                   ),
                 ),
                 IconButton(
                   onPressed:
-                      _loading ? null : _sendMessage,
+                      _loading
+                          ? null
+                          : _sendMessage,
                   icon: Icon(
                     Icons.send_rounded,
                     size: 34,
                     color: _loading
                         ? Colors.grey
-                        : const Color(0xFF673AB7),
+                        : const Color(
+                            0xFF673AB7,
+                          ),
                   ),
                 ),
               ],
@@ -1126,7 +1483,8 @@ $message
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding:
+            const EdgeInsets.fromLTRB(
           16,
           8,
           10,
@@ -1137,37 +1495,52 @@ $message
             Container(
               width: 54,
               height: 54,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE9D8FF),
-                borderRadius: BorderRadius.circular(18),
+              decoration:
+                  BoxDecoration(
+                color:
+                    const Color(
+                  0xFFE9D8FF,
+                ),
+                borderRadius:
+                    BorderRadius.circular(
+                  18,
+                ),
               ),
-              child: const Icon(
+              child:
+                  const Icon(
                 Icons.school_rounded,
                 size: 32,
-                color: Color(0xFF673AB7),
+                color:
+                    Color(0xFF673AB7),
               ),
             ),
             const SizedBox(width: 12),
             const Expanded(
               child: Column(
                 crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    CrossAxisAlignment
+                        .start,
                 children: [
                   Text(
                     'AI Personal Teacher',
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow:
+                        TextOverflow
+                            .ellipsis,
                     style: TextStyle(
                       fontSize: 23,
-                      fontWeight: FontWeight.w900,
+                      fontWeight:
+                          FontWeight.w900,
                     ),
                   ),
                   Text(
                     'आपका digital teacher',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w600,
+                      color:
+                          Colors.grey,
+                      fontWeight:
+                          FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1175,22 +1548,30 @@ $message
             ),
             IconButton(
               onPressed: _newChat,
-              icon: const Icon(
-                Icons.add_comment_outlined,
+              icon:
+                  const Icon(
+                Icons
+                    .add_comment_outlined,
                 size: 30,
               ),
-              tooltip: 'नई chat',
             ),
             PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'clear') {
+              onSelected:
+                  (value) {
+                if (value ==
+                    'clear') {
                   _newChat();
                 }
               },
-              itemBuilder: (context) => const [
+              itemBuilder:
+                  (context) =>
+                      const [
                 PopupMenuItem(
                   value: 'clear',
-                  child: Text('नई Chat'),
+                  child:
+                      Text(
+                    'नई Chat',
+                  ),
                 ),
               ],
             ),
@@ -1205,28 +1586,43 @@ $message
   // ============================================================
 
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+    WidgetsBinding.instance
+        .addPostFrameCallback(
+      (_) {
+        if (!_scrollController
+            .hasClients) {
+          return;
+        }
 
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
+        _scrollController
+            .animateTo(
+          _scrollController
+              .position
+              .maxScrollExtent,
+          duration:
+              const Duration(
+            milliseconds: 300,
+          ),
+          curve:
+              Curves.easeOut,
+        );
+      },
+    );
   }
 
   // ============================================================
-  // MESSAGE
+  // SNACKBAR
   // ============================================================
 
   void _showMessage(String text) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(text),
-        behavior: SnackBarBehavior.floating,
+        behavior:
+            SnackBarBehavior.floating,
       ),
     );
   }
@@ -1246,17 +1642,26 @@ $message
             child: _messages.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(
+                    controller:
+                        _scrollController,
+                    padding:
+                        const EdgeInsets
+                            .only(
                       top: 8,
                       bottom: 20,
                     ),
-                    itemCount: _messages.length +
-                        (_loading ? 1 : 0),
-                    itemBuilder: (context, index) {
+                    itemCount:
+                        _messages.length +
+                            (_loading
+                                ? 1
+                                : 0),
+                    itemBuilder:
+                        (context, index) {
                       if (index ==
-                          _messages.length) {
-                        return _buildLoadingBubble();
+                          _messages
+                              .length) {
+                        return
+                            _buildLoadingBubble();
                       }
 
                       return _buildMessage(
@@ -1271,26 +1676,40 @@ $message
     );
   }
 
+  // ============================================================
+  // LOADING
+  // ============================================================
+
   Widget _buildLoadingBubble() {
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment:
+          Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(
+        margin:
+            const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 8,
         ),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
+        padding:
+            const EdgeInsets.all(18),
+        decoration:
+            BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius:
+              BorderRadius.circular(
+            22,
+          ),
         ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
+        child:
+            const Row(
+          mainAxisSize:
+              MainAxisSize.min,
           children: [
             SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(
+              child:
+                  CircularProgressIndicator(
                 strokeWidth: 2.5,
               ),
             ),
@@ -1299,7 +1718,8 @@ $message
               'Teacher सोच रहा है...',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontWeight:
+                    FontWeight.w600,
               ),
             ),
           ],
@@ -1307,6 +1727,10 @@ $message
       ),
     );
   }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
 
   @override
   void dispose() {
