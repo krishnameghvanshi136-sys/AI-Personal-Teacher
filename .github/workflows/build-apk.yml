@@ -43,45 +43,32 @@ jobs:
             echo "Android project already exists."
           fi
 
+      - name: Remove default Flutter test
+        run: |
+          rm -rf test
+          echo "Default Flutter test removed."
+
+      - name: Configure Android permissions
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+
+          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
+            sed -i '/<application/i\
+              <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+          fi
+
+          if ! grep -q "android.permission.RECORD_AUDIO" "$MANIFEST"; then
+            sed -i '/<application/i\
+              <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
+          fi
+
+          echo "Android permissions configured."
+
       - name: Check Android project
         run: |
           test -f android/app/build.gradle.kts
           test -f android/app/src/main/AndroidManifest.xml
           echo "Android project OK"
-
-      - name: Configure Android permissions
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          manifest = Path(
-              "android/app/src/main/AndroidManifest.xml"
-          )
-
-          text = manifest.read_text()
-
-          permissions = [
-              'android.permission.INTERNET',
-              'android.permission.RECORD_AUDIO',
-          ]
-
-          for permission in permissions:
-              line = f'    <uses-permission android:name="{permission}"/>'
-
-              if permission not in text:
-                  text = text.replace(
-                      '<manifest',
-                      '<manifest',
-                      1
-                  )
-
-                  pos = text.find('>') + 1
-                  text = text[:pos] + '\n' + line + text[pos:]
-
-          manifest.write_text(text)
-
-          print("Android permissions configured.")
-          PY
 
       - name: Get dependencies
         run: |
@@ -113,6 +100,6 @@ jobs:
 
       - name: Build completed
         run: |
-          echo "================================"
+          echo "======================================"
           echo "AI PERSONAL TEACHER APK READY"
-          echo "================================"
+          echo "======================================"
