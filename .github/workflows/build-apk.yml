@@ -7,116 +7,77 @@ on:
       - main
 
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==========================================
-      # 1. CHECKOUT
-      # ==========================================
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-
-      # ==========================================
-      # 2. SETUP FLUTTER
-      # ==========================================
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: 3.47.0
           channel: stable
           cache: true
 
-
-      # ==========================================
-      # 3. CHECK FLUTTER
-      # ==========================================
       - name: Check Flutter
         run: |
           flutter --version
           dart --version
 
-
-      # ==========================================
-      # 4. CHECK PROJECT
-      # ==========================================
-      - name: Check AI Personal Teacher source
+      - name: Check project files
         run: |
-          set -e
-
-          echo "Checking project files..."
-
           test -f pubspec.yaml
           test -f lib/main.dart
+          test -f android/app/build.gradle.kts
+          test -f android/app/src/main/AndroidManifest.xml
+          echo "Project files OK"
 
-          echo "pubspec.yaml found"
-          echo "lib/main.dart found"
-
-
-      # ==========================================
-      # 5. CREATE / REPAIR ANDROID PROJECT
-      # ==========================================
-      - name: Configure Android project
+      - name: Configure Android permissions
+        shell: bash
         run: |
-          set -e
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
 
-          echo "Creating Android project..."
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || \
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
 
-          flutter create \
-            --platforms=android \
-            --project-name=ai_personal_teacher \
-            .
+          grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" || \
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
 
-          echo "Checking Android Gradle files..."
+          echo "Android permissions configured"
 
-          if [ -f android/app/build.gradle ]; then
-            echo "android/app/build.gradle found"
-          elif [ -f android/app/build.gradle.kts ]; then
-            echo "android/app/build.gradle.kts found"
-          else
-            echo "ERROR: Android Gradle file not found"
+      - name: Get dependencies
+        run: |
+          flutter clean
+          flutter pub get
+
+      - name: Analyze Flutter project
+        run: |
+          flutter analyze --no-fatal-infos
+
+      - name: Build Release APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "ERROR: GEMINI_API_KEY secret is missing."
             exit 1
           fi
 
-          echo "Android project ready."
+          flutter build apk --release \
+            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Personal-Teacher-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
 
-      # ==========================================
-      # 6. REMOVE DEFAULT TEST
-      # ==========================================
-      - name: Remove default Flutter test
+      - name: Build completed
         run: |
-          if [ -d "test" ]; then
-            rm -rf test
-            echo "Default test folder removed."
-          else
-            echo "No test folder found."
-          fi
-
-
-      # ==========================================
-      # 7. ANDROID PERMISSIONS
-      # ==========================================
-      - name: Configure Android permissions
-        run: |
-          set -e
-
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("android/app/src/main/AndroidManifest.xml")
-
-          text = path.read_text(encoding="utf-8")
-
-          permissions = [
-              "android.permission.INTERNET",
-              "android.permission.RECORD_AUDIO",
-              "android.permission.CAMERA",
-          ]
-
-          additions = []
-
-          for permission in permissions
+          echo "======================================"
+          echo "AI PERSONAL TEACHER APK READY"
+          echo "======================================"
