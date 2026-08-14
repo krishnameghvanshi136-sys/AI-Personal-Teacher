@@ -8,42 +8,75 @@ permissions:
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
+
+      # 1. GitHub repository download
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Flutter setup
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
+      # 3. Create Android project
       - name: Create Android project
         run: |
           rm -rf app
           flutter create --platforms=android app
+
+      # 4. Copy pubspec
+      - name: Copy pubspec.yaml
+        run: |
           cp pubspec.yaml app/pubspec.yaml
 
-      - name: Copy app source
+      # 5. Copy main.dart and lib files
+      - name: Copy Flutter source
         run: |
           rm -rf app/lib
           cp -r lib app/lib
 
+      # 6. Add Internet permission
       - name: Add Internet permission
         run: |
-          sed -i '/<manifest /a\    <uses-permission android:name="android.permission.INTERNET"/>' app/android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' \
+          app/android/app/src/main/AndroidManifest.xml
 
-      - name: Get dependencies
+      # 7. Check Gemini API key
+      - name: Check Gemini API Secret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "ERROR: GEMINI_API_KEY Secret नहीं मिला!"
+            exit 1
+          fi
+
+          echo "GEMINI_API_KEY Secret मिला है."
+
+      # 8. Flutter dependencies
+      - name: Flutter Pub Get
         working-directory: app
-        run: flutter pub get
+        run: |
+          flutter pub get
 
-      - name: Build APK
+      # 9. Build APK
+      - name: Build Release APK
         working-directory: app
-        run: flutter build apk --release --dart-define=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
+      # 10. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
           path: app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
