@@ -8,75 +8,119 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Build AI Personal Teacher APK
     runs-on: ubuntu-latest
 
     steps:
 
+      # 1. Repository download
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Flutter setup
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
 
+      # 3. Create Android project
       - name: Create Android project
         run: |
           rm -rf app
           flutter create --platforms=android app
+
           cp pubspec.yaml app/pubspec.yaml
 
+      # 4. Copy latest main.dart
       - name: Copy Flutter source
         run: |
           rm -rf app/lib
           cp -r lib app/lib
 
-      - name: Add Android permissions
+      # 5. Add Android permissions
+      - name: Configure Android permissions
         run: |
-          MANIFEST="app/android/app/src/main/AndroidManifest.xml"
+          python3 <<'PY'
+          from pathlib import Path
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
+          manifest = Path(
+              "app/android/app/src/main/AndroidManifest.xml"
+          )
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
+          text = manifest.read_text()
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.BLUETOOTH"/>' "$MANIFEST"
+          permissions = [
+              "android.permission.INTERNET",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.CAMERA",
+          ]
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>' "$MANIFEST"
+          for permission in permissions:
+              line = (
+                  f'    <uses-permission '
+                  f'android:name="{permission}"/>'
+              )
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>' "$MANIFEST"
+              if permission not in text:
+                  text = text.replace(
+                      "<manifest",
+                      "<manifest",
+                      1
+                  )
 
-          sed -i '/<manifest/a\
-              <uses-permission android:name="android.permission.CAMERA"/>' "$MANIFEST"
+                  pos = text.find(">")
 
-          sed -i '/<\/manifest>/i\
-              <queries>\
-                  <intent>\
-                      <action android:name="android.speech.RecognitionService" />\
-                  </intent>\
-              </queries>' "$MANIFEST"
+                  if pos != -1:
+                      text = (
+                          text[:pos + 1]
+                          + "\n"
+                          + line
+                          + text[pos + 1:]
+                      )
 
-      - name: Check Gemini API Secret
+          queries = """
+              <queries>
+                  <intent>
+                      <action android:name="android.speech.RecognitionService" />
+                  </intent>
+              </queries>
+          """
+
+          if "android.speech.RecognitionService" not in text:
+              text = text.replace(
+                  "</manifest>",
+                  queries + "\n</manifest>"
+              )
+
+          manifest.write_text(text)
+          PY
+
+      # 6. Check Gemini API key
+      - name: Check Gemini API Key
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           if [ -z "$GEMINI_API_KEY" ]; then
             echo "ERROR: GEMINI_API_KEY Secret नहीं मिला!"
+            echo "GitHub Settings > Secrets and variables > Actions check करें."
             exit 1
           fi
 
           echo "GEMINI_API_KEY Secret मौजूद है."
 
+      # 7. Get Flutter packages
       - name: Flutter Pub Get
         working-directory: app
         run: |
           flutter pub get
 
+      # 8. Check Flutter project
+      - name: Flutter Analyze
+        working-directory: app
+        run: |
+          flutter analyze
+
+      # 9. Build release APK
       - name: Build Release APK
         working-directory: app
         env:
@@ -85,6 +129,7 @@ jobs:
           flutter build apk --release \
             --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
+      # 10. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
