@@ -7,6 +7,13 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+const String geminiApiKey = String.fromEnvironment(
+  'GEMINI_API_KEY',
+  defaultValue: '',
+);
+
+const String geminiModel = 'gemini-3.6-flash';
+
 void main() {
   runApp(const AIPersonalTeacher());
 }
@@ -21,36 +28,28 @@ class AIPersonalTeacher extends StatelessWidget {
       title: 'AI Personal Teacher',
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'sans',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
+          seedColor: const Color(0xFF673AB7),
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFF9F5FF),
       ),
       home: const TeacherHomePage(),
     );
   }
 }
 
-// ------------------------------------------------------------
-// CHAT MESSAGE
-// ------------------------------------------------------------
-
 class ChatMessage {
-  final String text;
   final bool isUser;
-  final DateTime time;
+  final String text;
+  final String? imagePath;
 
   ChatMessage({
-    required this.text,
     required this.isUser,
-    DateTime? time,
-  }) : time = time ?? DateTime.now();
+    required this.text,
+    this.imagePath,
+  });
 }
-
-// ------------------------------------------------------------
-// HOME PAGE
-// ------------------------------------------------------------
 
 class TeacherHomePage extends StatefulWidget {
   const TeacherHomePage({super.key});
@@ -60,60 +59,25 @@ class TeacherHomePage extends StatefulWidget {
 }
 
 class _TeacherHomePageState extends State<TeacherHomePage> {
-  // ----------------------------------------------------------
-  // API
-  // ----------------------------------------------------------
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
-  static const String apiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: '',
-  );
+  final ImagePicker _imagePicker = ImagePicker();
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _tts = FlutterTts();
 
-  // Current recommended model.
-  static const String primaryModel = 'gemini-3.5-flash';
-
-  // Lower-cost fallback.
-  static const String fallbackModel = 'gemini-3.1-flash-lite';
-
-  // ----------------------------------------------------------
-  // CONTROLLERS
-  // ----------------------------------------------------------
-
-  final TextEditingController questionController =
-      TextEditingController();
-
-  final ScrollController scrollController =
-      ScrollController();
-
-  final ImagePicker imagePicker = ImagePicker();
-
-  final stt.SpeechToText speech = stt.SpeechToText();
-
-  final FlutterTts tts = FlutterTts();
-
-  // ----------------------------------------------------------
-  // STATE
-  // ----------------------------------------------------------
-
-  final List<ChatMessage> messages = [];
+  final List<ChatMessage> _messages = [];
 
   bool studyMode = false;
-  bool listening = false;
   bool loading = false;
-  bool speaking = false;
-
-  bool speechAvailable = false;
+  bool listening = false;
 
   String selectedClass = 'कक्षा 5';
   String selectedSubject = 'गणित';
 
   XFile? selectedImage;
 
-  // ----------------------------------------------------------
-  // CLASS OPTIONS
-  // ----------------------------------------------------------
-
-  final List<String> classes = const [
+  final List<String> classes = [
     'कक्षा 1',
     'कक्षा 2',
     'कक्षा 3',
@@ -128,136 +92,77 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     'कक्षा 12',
   ];
 
-  final List<String> subjects = const [
+  final List<String> subjects = [
     'गणित',
-    'विज्ञान',
-    'अंग्रेजी',
     'हिंदी',
+    'अंग्रेजी',
+    'विज्ञान',
     'सामाजिक विज्ञान',
-    'भौतिक विज्ञान',
-    'रसायन विज्ञान',
-    'जीव विज्ञान',
+    'इतिहास',
+    'भूगोल',
     'कंप्यूटर',
     'सामान्य ज्ञान',
   ];
 
-  // ----------------------------------------------------------
-  // INIT
-  // ----------------------------------------------------------
-
   @override
   void initState() {
     super.initState();
-
-    setupTts();
-    setupSpeech();
+    _initializeTts();
+    _initializeSpeech();
   }
 
-  Future<void> setupTts() async {
-    try {
-      await tts.setLanguage('hi-IN');
-      await tts.setSpeechRate(0.45);
-      await tts.setVolume(1.0);
-      await tts.setPitch(1.0);
-
-      tts.setStartHandler(() {
-        if (!mounted) return;
-
-        setState(() {
-          speaking = true;
-        });
-      });
-
-      tts.setCompletionHandler(() {
-        if (!mounted) return;
-
-        setState(() {
-          speaking = false;
-        });
-      });
-
-      tts.setCancelHandler(() {
-        if (!mounted) return;
-
-        setState(() {
-          speaking = false;
-        });
-      });
-
-      tts.setErrorHandler((message) {
-        if (!mounted) return;
-
-        setState(() {
-          speaking = false;
-        });
-      });
-    } catch (_) {}
+  Future<void> _initializeTts() async {
+    await _tts.setLanguage('hi-IN');
+    await _tts.setSpeechRate(0.48);
+    await _tts.setPitch(1.0);
   }
 
-  Future<void> setupSpeech() async {
-    try {
-      speechAvailable = await speech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-
-          if (status == 'done' || status == 'notListening') {
+  Future<void> _initializeSpeech() async {
+    await _speech.initialize(
+      onStatus: (status) {
+        if (status == 'done' || status == 'notListening') {
+          if (mounted) {
             setState(() {
               listening = false;
             });
           }
-        },
-        onError: (error) {
-          if (!mounted) return;
-
+        }
+      },
+      onError: (error) {
+        if (mounted) {
           setState(() {
             listening = false;
           });
-        },
-      );
-    } catch (_) {
-      speechAvailable = false;
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
+        }
+      },
+    );
   }
-
-  // ----------------------------------------------------------
-  // DISPOSE
-  // ----------------------------------------------------------
 
   @override
   void dispose() {
-    questionController.dispose();
-    scrollController.dispose();
-    speech.stop();
-    tts.stop();
-
+    _controller.dispose();
+    _scrollController.dispose();
+    _tts.stop();
+    _speech.stop();
     super.dispose();
   }
 
-  // ----------------------------------------------------------
-  // VOICE INPUT
-  // ----------------------------------------------------------
-
-  Future<void> startListening() async {
+  Future<void> _startListening() async {
     if (loading) return;
 
-    if (!speechAvailable) {
-      speechAvailable = await speech.initialize();
+    if (!_speech.isAvailable) {
+      final available = await _speech.initialize();
 
-      if (!speechAvailable) {
-        showMessage(
-          '🎤 Microphone उपलब्ध नहीं है।\n\n'
-          'फोन की Settings → App Permissions → Microphone को Allow करें।',
+      if (!available) {
+        _showSnackBar(
+          'Mic उपलब्ध नहीं है। फोन की Microphone permission check करें।',
         );
         return;
       }
     }
 
     if (listening) {
-      await speech.stop();
+      await _speech.stop();
 
       if (mounted) {
         setState(() {
@@ -268,117 +173,36 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       return;
     }
 
-    try {
+    if (mounted) {
       setState(() {
         listening = true;
       });
+    }
 
-      await speech.listen(
-        localeId: 'hi_IN',
-        listenMode: stt.ListenMode.dictation,
+    await _speech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+
+        setState(() {
+          _controller.text = result.recognizedWords;
+          _controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: _controller.text.length),
+          );
+        });
+      },
+      listenOptions: stt.SpeechListenOptions(
         partialResults: true,
-        onResult: (result) {
-          if (!mounted) return;
-
-          final text = result.recognizedWords;
-
-          if (text.isNotEmpty) {
-            setState(() {
-              questionController.text = text;
-
-              questionController.selection =
-                  TextSelection.fromPosition(
-                TextPosition(
-                  offset: questionController.text.length,
-                ),
-              );
-            });
-          }
-        },
-      );
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        listening = false;
-      });
-
-      showMessage(
-        '🎤 Voice input में समस्या हुई।\n'
-        'Microphone permission check करें।',
-      );
-    }
+        listenMode: stt.ListenMode.dictation,
+      ),
+    );
   }
 
-  // ----------------------------------------------------------
-  // IMAGE PICKER
-  // ----------------------------------------------------------
-
-  Future<void> pickImage() async {
+  Future<void> _pickImage() async {
     if (loading) return;
 
-    try {
-      final XFile? image = await imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-        maxWidth: 1600,
-        maxHeight: 1600,
-      );
-
-      if (image == null) return;
-
-      if (!mounted) return;
-
-      setState(() {
-        selectedImage = image;
-      });
-    } catch (e) {
-      showMessage(
-        '📷 Camera नहीं खुल पाई।\n\n'
-        'Settings → Apps → AI Personal Teacher → Permissions '
-        'में Camera Allow करें।',
-      );
-    }
-  }
-
-  // ----------------------------------------------------------
-  // GALLERY PICKER
-  // ----------------------------------------------------------
-
-  Future<void> pickFromGallery() async {
-    if (loading) return;
-
-    try {
-      final XFile? image = await imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-        maxWidth: 1600,
-        maxHeight: 1600,
-      );
-
-      if (image == null) return;
-
-      if (!mounted) return;
-
-      setState(() {
-        selectedImage = image;
-      });
-    } catch (_) {
-      showMessage(
-        '📷 Photo select नहीं हो पाई।',
-      );
-    }
-  }
-
-  // ----------------------------------------------------------
-  // IMAGE MENU
-  // ----------------------------------------------------------
-
-  void showImageOptions() {
-    if (loading) return;
-
-    showModalBottomSheet(
+    final choice = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(24),
@@ -392,38 +216,26 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'सवाल की फोटो',
+                  'सवाल की फोटो लें',
                   style: TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 ListTile(
-                  leading: const Icon(
-                    Icons.camera_alt,
-                    size: 30,
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.camera_alt),
                   ),
-                  title: const Text(
-                    'Camera से फोटो लें',
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    pickImage();
-                  },
+                  title: const Text('Camera से फोटो लें'),
+                  onTap: () => Navigator.pop(context, 'camera'),
                 ),
                 ListTile(
-                  leading: const Icon(
-                    Icons.photo_library,
-                    size: 30,
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.photo_library),
                   ),
-                  title: const Text(
-                    'Gallery से फोटो चुनें',
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    pickFromGallery();
-                  },
+                  title: const Text('Gallery से फोटो चुनें'),
+                  onTap: () => Navigator.pop(context, 'gallery'),
                 ),
               ],
             ),
@@ -431,36 +243,51 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
         );
       },
     );
+
+    if (choice == null) return;
+
+    try {
+      XFile? image;
+
+      if (choice == 'camera') {
+        image = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 75,
+          maxWidth: 1600,
+          maxHeight: 1600,
+        );
+      } else {
+        image = await _imagePicker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 75,
+          maxWidth: 1600,
+          maxHeight: 1600,
+        );
+      }
+
+      if (image != null && mounted) {
+        setState(() {
+          selectedImage = image;
+        });
+      }
+    } catch (e) {
+      _showSnackBar('फोटो खोलने में समस्या हुई। Permission check करें।');
+    }
   }
 
-  // ----------------------------------------------------------
-  // SEND QUESTION
-  // ----------------------------------------------------------
-
-  Future<void> askTeacher() async {
+  Future<void> _sendMessage() async {
     if (loading) return;
 
-    final question = questionController.text.trim();
+    final question = _controller.text.trim();
+    final image = selectedImage;
 
-    if (question.isEmpty && selectedImage == null) {
-      showMessage(
-        'पहले अपना सवाल लिखें, बोलें या फोटो भेजें।',
-      );
+    if (question.isEmpty && image == null) {
+      _showSnackBar('पहले अपना सवाल लिखें या फोटो लें।');
       return;
     }
 
-    if (apiKey.trim().isEmpty) {
-      showMessage(
-        'Gemini API Key उपलब्ध नहीं है।\n\n'
-        'GitHub → Settings → Secrets and variables → Actions '
-        'में GEMINI_API_KEY check करें।',
-      );
-      return;
-    }
-
-    // Stop voice if active.
     if (listening) {
-      await speech.stop();
+      await _speech.stop();
 
       if (mounted) {
         setState(() {
@@ -469,121 +296,135 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       }
     }
 
-    final XFile? imageToSend = selectedImage;
+    final userText = question.isEmpty
+        ? 'इस फोटो में दिए गए सवाल को हल करके समझाइए।'
+        : question;
 
-    // Add user message immediately.
     setState(() {
-      messages.add(
+      _messages.add(
         ChatMessage(
-          text: question.isEmpty
-              ? '📷 फोटो में दिया गया सवाल'
-              : question,
           isUser: true,
+          text: userText,
+          imagePath: image?.path,
         ),
       );
 
-      questionController.clear();
+      _controller.clear();
       selectedImage = null;
       loading = true;
     });
 
-    await scrollToBottom();
+    _scrollToBottom();
 
     try {
-      final answer = await askGemini(
-        question: question.isEmpty
-            ? 'इस फोटो में दिए गए सवाल को पढ़कर हल करो।'
-            : question,
-        image: imageToSend,
+      final answer = await _askGemini(
+        userQuestion: userText,
+        imageFile: image,
       );
 
       if (!mounted) return;
 
       setState(() {
-        messages.add(
+        _messages.add(
           ChatMessage(
-            text: cleanAnswer(answer),
             isUser: false,
+            text: answer,
           ),
         );
 
         loading = false;
       });
 
-      await scrollToBottom();
+      _scrollToBottom();
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        messages.add(
+        _messages.add(
           ChatMessage(
-            text: makeFriendlyError(e),
             isUser: false,
+            text: _friendlyError(e),
           ),
         );
 
         loading = false;
       });
 
-      await scrollToBottom();
+      _scrollToBottom();
     }
   }
 
-  // ----------------------------------------------------------
-  // GEMINI API
-  // ----------------------------------------------------------
-
-  Future<String> askGemini({
-    required String question,
-    XFile? image,
+  Future<String> _askGemini({
+    required String userQuestion,
+    XFile? imageFile,
   }) async {
-    // Try primary model first.
-    try {
-      return await callGemini(
-        model: primaryModel,
-        question: question,
-        image: image,
+    if (geminiApiKey.trim().isEmpty) {
+      throw Exception(
+        'API_KEY_MISSING',
       );
-    } catch (e) {
-      final error = e.toString().toLowerCase();
-
-      // If model not found / unavailable, try fallback.
-      if (error.contains('404') ||
-          error.contains('not_found') ||
-          error.contains('not found') ||
-          error.contains('unavailable')) {
-        return await callGemini(
-          model: fallbackModel,
-          question: question,
-          image: image,
-        );
-      }
-
-      rethrow;
     }
-  }
 
-  // ----------------------------------------------------------
-  // GEMINI REQUEST
-  // ----------------------------------------------------------
-
-  Future<String> callGemini({
-    required String model,
-    required String question,
-    XFile? image,
-  }) async {
     final uri = Uri.parse(
-      'https://generativelanguage.googleapis.com/v1beta/'
-      'models/$model:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/'
+      '$geminiModel:generateContent',
     );
 
-    final List<Map<String, dynamic>> contents = [];
+    final parts = <Map<String, dynamic>>[];
 
-    // --------------------------------------------------------
-    // Previous conversation
-    // --------------------------------------------------------
+    final systemPrompt = '''
+आप "AI Personal Teacher" हैं।
 
-    for (final message in messages) {
+आपका काम एक अच्छे स्कूल शिक्षक की तरह विद्यार्थी को पढ़ाना है।
+
+विद्यार्थी की जानकारी:
+कक्षा: $selectedClass
+विषय: $selectedSubject
+Study Mode: ${studyMode ? 'ON' : 'OFF'}
+
+नियम:
+1. विद्यार्थी को आसान और स्पष्ट भाषा में समझाएं।
+2. अगर विद्यार्थी हिंदी में पूछे तो हिंदी में जवाब दें।
+3. अगर विद्यार्थी अंग्रेजी में पूछे तो अंग्रेजी में जवाब दें।
+4. गणित के सवाल में सही calculation करें।
+5. गणित में जरूरत होने पर Step 1, Step 2, Step 3 में समझाएं।
+6. बहुत कठिन शब्दों से बचें।
+7. छोटे विद्यार्थी के लिए उदाहरण दें।
+8. सिर्फ अंतिम उत्तर न दें, जरूरत के अनुसार समझाएं।
+9. अगर फोटो में सवाल है तो फोटो को ध्यान से पढ़कर उसका समाधान दें।
+10. Study Mode ON होने पर पहले concept समझाएं, फिर example दें और अंत में छोटा practice question दें।
+11. विद्यार्थी अगर सामान्य बातचीत करे तो सामान्य शिक्षक की तरह जवाब दें।
+12. Markdown के बहुत ज्यादा symbols जैसे ** और ### का उपयोग न करें।
+13. जवाब साफ, mobile-friendly और पढ़ने में आसान रखें।
+14. अगर सवाल अधूरा हो तो विद्यार्थी से जरूरी जानकारी पूछें।
+''';
+
+    final combinedPrompt = '''
+$systemPrompt
+
+विद्यार्थी का नया सवाल:
+$userQuestion
+''';
+
+    parts.add({
+      'text': combinedPrompt,
+    });
+
+    if (imageFile != null) {
+      final bytes = await File(imageFile.path).readAsBytes();
+
+      final base64Image = base64Encode(bytes);
+
+      parts.add({
+        'inline_data': {
+          'mime_type': _imageMimeType(imageFile.path),
+          'data': base64Image,
+        },
+      });
+    }
+
+    final contents = <Map<String, dynamic>>[];
+
+    for (final message in _messages) {
       if (message.isUser) {
         contents.add({
           'role': 'user',
@@ -605,51 +446,26 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       }
     }
 
-    // --------------------------------------------------------
-    // Current user request
-    // --------------------------------------------------------
-
-    final List<Map<String, dynamic>> currentParts = [];
-
-    if (image != null) {
-      final bytes = await File(image.path).readAsBytes();
-
-      final base64Image = base64Encode(bytes);
-
-      String mimeType = 'image/jpeg';
-
-      final path = image.path.toLowerCase();
-
-      if (path.endsWith('.png')) {
-        mimeType = 'image/png';
-      } else if (path.endsWith('.webp')) {
-        mimeType = 'image/webp';
-      }
-
-      currentParts.add({
-        'inline_data': {
-          'mime_type': mimeType,
-          'data': base64Image,
-        },
-      });
+    if (contents.isNotEmpty) {
+      contents.removeLast();
     }
-
-    currentParts.add({
-      'text': buildTeacherPrompt(question),
-    });
 
     contents.add({
       'role': 'user',
-      'parts': currentParts,
+      'parts': parts,
     });
 
-    // --------------------------------------------------------
-    // API BODY
-    // --------------------------------------------------------
-
     final body = {
+      'system_instruction': {
+        'parts': [
+          {
+            'text': systemPrompt,
+          }
+        ],
+      },
       'contents': contents,
       'generationConfig': {
+        'temperature': 0.5,
         'maxOutputTokens': 2048,
       },
     };
@@ -659,7 +475,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
           uri,
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey.trim(),
+            'x-goog-api-key': geminiApiKey,
           },
           body: jsonEncode(body),
         )
@@ -667,755 +483,554 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
           const Duration(seconds: 60),
         );
 
-    debugPrint(
-      'Gemini HTTP Status: ${response.statusCode}',
-    );
-
-    debugPrint(
-      'Gemini Response: ${response.body}',
-    );
-
-    // --------------------------------------------------------
-    // ERROR
-    // --------------------------------------------------------
-
-    if (response.statusCode != 200) {
-      String message = 'Gemini API Error ${response.statusCode}';
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String details = '';
 
       try {
-        final errorData = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
 
-        final apiError = errorData['error'];
-
-        if (apiError is Map) {
-          final apiMessage = apiError['message'];
-
-          if (apiMessage != null) {
-            message = apiMessage.toString();
-          }
-        }
-      } catch (_) {}
+        details = decoded['error']?['message']?.toString() ?? '';
+      } catch (_) {
+        details = response.body;
+      }
 
       throw Exception(
-        'Gemini API Error ${response.statusCode}: $message',
+        'API_${response.statusCode}: $details',
       );
     }
 
-    // --------------------------------------------------------
-    // RESPONSE
-    // --------------------------------------------------------
-
-    final Map<String, dynamic> data =
-        jsonDecode(response.body);
+    final data = jsonDecode(response.body);
 
     final candidates = data['candidates'];
 
     if (candidates == null ||
         candidates is! List ||
         candidates.isEmpty) {
-      throw Exception(
-        'Gemini ने कोई जवाब नहीं दिया।',
-      );
+      throw Exception('EMPTY_RESPONSE');
     }
 
-    final firstCandidate = candidates.first;
+    final content = candidates[0]['content'];
 
-    if (firstCandidate is! Map) {
-      throw Exception(
-        'Gemini response format सही नहीं है।',
-      );
-    }
-
-    final content = firstCandidate['content'];
-
-    if (content is! Map) {
-      throw Exception(
-        'Gemini response खाली है।',
-      );
+    if (content == null) {
+      throw Exception('NO_CONTENT');
     }
 
     final responseParts = content['parts'];
 
-    if (responseParts == null ||
-        responseParts is! List ||
-        responseParts.isEmpty) {
-      throw Exception(
-        'Gemini response में text नहीं मिला।',
-      );
+    if (responseParts == null || responseParts is! List) {
+      throw Exception('NO_TEXT');
     }
 
-    final StringBuffer buffer = StringBuffer();
+    final buffer = StringBuffer();
 
     for (final part in responseParts) {
-      if (part is Map) {
-        final text = part['text'];
-
-        if (text != null) {
-          buffer.write(text.toString());
-        }
+      if (part is Map && part['text'] != null) {
+        buffer.write(part['text']);
       }
     }
 
-    final result = buffer.toString().trim();
+    final answer = buffer.toString().trim();
 
-    if (result.isEmpty) {
-      throw Exception(
-        'AI ने खाली जवाब दिया।',
-      );
+    if (answer.isEmpty) {
+      throw Exception('EMPTY_TEXT');
     }
 
-    return result;
+    return _cleanAnswer(answer);
   }
 
-  // ----------------------------------------------------------
-  // TEACHER PROMPT
-  // ----------------------------------------------------------
+  String _imageMimeType(String path) {
+    final lower = path.toLowerCase();
 
-  String buildTeacherPrompt(String question) {
-    final modeInstruction = studyMode
-        ? '''
-STUDY MODE ON है।
+    if (lower.endsWith('.png')) {
+      return 'image/png';
+    }
 
-Student को सिर्फ answer मत दो।
-Teacher की तरह पढ़ाओ।
+    if (lower.endsWith('.webp')) {
+      return 'image/webp';
+    }
 
-पहले concept समझाओ।
-फिर आसान example दो।
-फिर जरूरत हो तो step-by-step solution दो।
-अंत में एक छोटा practice question दो।
+    if (lower.endsWith('.heic')) {
+      return 'image/heic';
+    }
 
-Student की class और subject को ध्यान में रखो।
-'''
-        : '''
-Normal chat mode में जवाब दो।
-
-Student के सवाल का सीधा और आसान जवाब दो।
-अगर सवाल पढ़ाई से जुड़ा है तो teacher की तरह समझाओ।
-जरूरत होने पर example दो।
-''';
-
-    return '''
-आप "AI Personal Teacher" हैं।
-
-आपका काम एक friendly Indian school teacher की तरह student को पढ़ाना है।
-
-Student की जानकारी:
-
-कक्षा: $selectedClass
-विषय: $selectedSubject
-
-$modeInstruction
-
-महत्वपूर्ण नियम:
-
-1. जवाब मुख्य रूप से सरल हिंदी में दो।
-2. अगर student English में सवाल पूछता है तो जरूरत के अनुसार English में भी समझा सकते हो।
-3. बहुत कठिन भाषा का इस्तेमाल मत करो।
-4. Student की class से ऊपर का अनावश्यक कठिन concept मत लाओ।
-5. Maths में calculation बिल्कुल सही करो।
-6. Maths में step-by-step समझाओ।
-7. Science में पहले concept, फिर example समझाओ।
-8. English सीखने वाले student को pronunciation और simple meaning भी समझा सकते हो।
-9. अगर photo भेजी गई है तो photo को ध्यान से पढ़कर सवाल हल करो।
-10. अगर photo में सवाल साफ नहीं है तो student को बताओ कि कौन सा हिस्सा साफ नहीं है।
-11. गलत answer मिलने पर politely correction करो।
-12. केवल answer देकर छोड़ना नहीं है जब explanation जरूरी हो।
-13. जवाब में markdown के double asterisk ** का इस्तेमाल मत करो।
-14. अनावश्यक बहुत लंबे paragraphs मत बनाओ।
-15. छोटे headings और numbered steps इस्तेमाल कर सकते हो।
-16. Student को confuse करने वाली technical language से बचो।
-17. अंत में जरूरत हो तो "अब तुम यह सवाल हल करो:" देकर छोटा practice question दो।
-18. यदि student सामान्य बातचीत करे तो सामान्य friendly जवाब दो।
-19. किसी भी सवाल का जवाब ईमानदारी से दो। जानकारी न हो तो ऐसा बताओ।
-20. Student को डांटना या शर्मिंदा नहीं करना है।
-
-Student का सवाल:
-
-$question
-''';
+    return 'image/jpeg';
   }
 
-  // ----------------------------------------------------------
-  // CLEAN ANSWER
-  // ----------------------------------------------------------
-
-  String cleanAnswer(String text) {
-    String result = text;
-
-    // Remove markdown bold markers.
-    result = result.replaceAll('**', '');
-
-    // Remove markdown heading markers.
-    result = result.replaceAll(
-      RegExp(r'^#{1,6}\s*', multiLine: true),
-      '',
-    );
-
-    // Remove unwanted markdown bullets.
-    result = result.replaceAll(
-      RegExp(r'^\*\s+', multiLine: true),
-      '• ',
-    );
-
-    return result.trim();
+  String _cleanAnswer(String text) {
+    return text
+        .replaceAll('### ', '')
+        .replaceAll('**', '')
+        .replaceAll('__', '')
+        .trim();
   }
 
-  // ----------------------------------------------------------
-  // FRIENDLY ERROR
-  // ----------------------------------------------------------
-
-  String makeFriendlyError(Object error) {
+  String _friendlyError(Object error) {
     final message = error.toString();
 
-    final lower = message.toLowerCase();
-
-    if (lower.contains('401') ||
-        lower.contains('403') ||
-        lower.contains('api key') ||
-        lower.contains('permission')) {
+    if (message.contains('API_KEY_MISSING')) {
       return '''
-❌ Gemini API Key में समस्या है।
+❌ Gemini API Key नहीं मिली।
 
-GitHub में check करें:
-
-Settings
-→ Secrets and variables
-→ Actions
-→ GEMINI_API_KEY
-
-API key सही Secret में होनी चाहिए।
+GitHub Actions में GEMINI_API_KEY secret check करें और APK को दोबारा build करें।
 ''';
     }
 
-    if (lower.contains('429') ||
-        lower.contains('quota') ||
-        lower.contains('too many')) {
+    if (message.contains('API_400')) {
       return '''
-⏳ अभी Gemini API पर ज्यादा requests हैं या quota पूरा हो गया है।
+❌ Gemini request गलत है।
 
-कुछ समय बाद फिर कोशिश करें।
+API request या model configuration में समस्या है।
+
+Technical error:
+$message
 ''';
     }
 
-    if (lower.contains('404') ||
-        lower.contains('not_found') ||
-        lower.contains('not found')) {
+    if (message.contains('API_401') ||
+        message.contains('API_403')) {
       return '''
-❌ Gemini model उपलब्ध नहीं मिला।
+❌ Gemini API Key स्वीकार नहीं हुई।
 
-App ने दूसरा available model भी try किया, लेकिन request सफल नहीं हुई।
-
-Internet और Gemini API key check करें।
+Google AI Studio में API key check करें और देखें कि key सही project की है।
 ''';
     }
 
-    if (lower.contains('timeout') ||
-        lower.contains('timed out')) {
+    if (message.contains('API_404')) {
+      return '''
+❌ Gemini model उपलब्ध नहीं है।
+
+Current model:
+$geminiModel
+
+Technical error:
+$message
+''';
+    }
+
+    if (message.contains('API_429')) {
+      return '''
+⏳ Gemini पर अभी बहुत ज्यादा requests हैं।
+
+कुछ देर बाद फिर कोशिश करें।
+''';
+    }
+
+    if (message.contains('TimeoutException')) {
       return '''
 🌐 Internet connection बहुत slow है।
 
-Internet check करके फिर सवाल भेजें।
-''';
-    }
-
-    if (lower.contains('socket') ||
-        lower.contains('connection')) {
-      return '''
-🌐 Internet connection में समस्या है।
-
-Mobile data/Wi-Fi check करके फिर कोशिश करें।
+Internet check करके फिर कोशिश करें।
 ''';
     }
 
     return '''
-❌ अभी जवाब नहीं मिल पाया।
+❌ जवाब नहीं मिल पाया।
 
-Internet connection और Gemini API key check करें।
-फिर दोबारा कोशिश करें।
+Technical error:
+$message
+
+Internet और Gemini API key check करें।
 ''';
   }
 
-  // ----------------------------------------------------------
-  // TEXT TO SPEECH
-  // ----------------------------------------------------------
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
 
-  Future<void> speak(String text) async {
-    try {
-      if (speaking) {
-        await tts.stop();
-
-        if (mounted) {
-          setState(() {
-            speaking = false;
-          });
-        }
-
-        return;
-      }
-
-      String speechText = text;
-
-      // Remove emojis and excessive formatting for TTS.
-      speechText = speechText.replaceAll(
-        RegExp(r'[^\u0000-\uFFFF]'),
-        ' ',
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
       );
-
-      await tts.setLanguage(
-        detectSpeechLanguage(speechText),
-      );
-
-      await tts.setSpeechRate(0.45);
-      await tts.setVolume(1.0);
-      await tts.setPitch(1.0);
-
-      await tts.speak(speechText);
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          speaking = false;
-        });
-      }
-    }
+    });
   }
 
-  String detectSpeechLanguage(String text) {
-    final hasHindi = RegExp(
-      r'[\u0900-\u097F]',
-    ).hasMatch(text);
+  Future<void> _speak(String text) async {
+    await _tts.stop();
 
-    if (hasHindi) {
+    final language = _detectLanguage(text);
+
+    await _tts.setLanguage(language);
+    await _tts.setSpeechRate(0.48);
+    await _tts.speak(text);
+  }
+
+  String _detectLanguage(String text) {
+    final hindiPattern = RegExp(r'[\u0900-\u097F]');
+
+    if (hindiPattern.hasMatch(text)) {
       return 'hi-IN';
     }
 
     return 'en-IN';
   }
 
-  // ----------------------------------------------------------
-  // SCROLL
-  // ----------------------------------------------------------
-
-  Future<void> scrollToBottom() async {
-    await Future.delayed(
-      const Duration(milliseconds: 100),
-    );
-
-    if (!scrollController.hasClients) return;
-
-    await scrollController.animateTo(
-      scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
-  }
-
-  // ----------------------------------------------------------
-  // CLEAR CHAT
-  // ----------------------------------------------------------
-
-  void clearChat() {
-    if (loading) return;
-
-    if (messages.isEmpty) return;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Chat साफ करें?',
-          ),
-          content: const Text(
-            'सभी सवाल और जवाब हट जाएंगे।',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'नहीं',
-              ),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-
-                setState(() {
-                  messages.clear();
-                });
-              },
-              child: const Text(
-                'साफ करें',
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ----------------------------------------------------------
-  // MESSAGE
-  // ----------------------------------------------------------
-
-  void showMessage(String message) {
+  void _showSnackBar(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  // ----------------------------------------------------------
-  // BUILD
-  // ----------------------------------------------------------
+  void _clearChat() {
+    if (_messages.isEmpty) return;
+
+    setState(() {
+      _messages.clear();
+    });
+
+    _showSnackBar('Chat साफ कर दी गई।');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF9F5FF),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: const Color(0xFFF9F5FF),
         surfaceTintColor: Colors.transparent,
-        titleSpacing: 18,
-        title: const Row(
+        leading: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9D9FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.school,
+              color: Color(0xFF673AB7),
+            ),
+          ),
+        ),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 21,
-              backgroundColor: Color(0xFFE7D9FF),
-              child: Icon(
-                Icons.school,
-                color: Colors.deepPurple,
-                size: 26,
+            Text(
+              'AI Personal Teacher',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
               ),
             ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'AI Personal Teacher',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'आपका digital teacher',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
+            Text(
+              'आपका digital teacher',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'New Chat',
-            onPressed: loading ? null : clearChat,
-            icon: const Icon(
-              Icons.add_comment_outlined,
-              size: 29,
-            ),
+            tooltip: 'नई Chat',
+            onPressed: loading ? null : _clearChat,
+            icon: const Icon(Icons.add_comment_outlined),
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'clear') {
-                clearChat();
+                _clearChat();
               }
             },
-            itemBuilder: (context) {
-              return const [
-                PopupMenuItem(
-                  value: 'clear',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline),
-                      SizedBox(width: 10),
-                      Text('Chat साफ करें'),
-                    ],
-                  ),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline),
+                    SizedBox(width: 10),
+                    Text('Chat साफ करें'),
+                  ],
                 ),
-              ];
-            },
+              ),
+            ],
           ),
         ],
       ),
-
       body: Column(
         children: [
-          // --------------------------------------------------
-          // STUDY SETTINGS
-          // --------------------------------------------------
-
-          buildStudyPanel(),
-
-          // --------------------------------------------------
-          // CHAT
-          // --------------------------------------------------
+          _buildStudyPanel(),
 
           Expanded(
-            child: messages.isEmpty
-                ? buildWelcome()
+            child: _messages.isEmpty
+                ? _buildWelcome()
                 : ListView.builder(
-                    controller: scrollController,
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(
                       16,
-                      10,
+                      12,
                       16,
-                      16,
+                      20,
                     ),
-                    itemCount:
-                        messages.length + (loading ? 1 : 0),
+                    itemCount: _messages.length + (loading ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (index >= messages.length) {
-                        return buildLoadingBubble();
+                      if (index == _messages.length) {
+                        return _buildLoadingMessage();
                       }
 
-                      return buildMessageBubble(
-                        messages[index],
+                      return _buildMessage(
+                        _messages[index],
                       );
                     },
                   ),
           ),
 
-          // --------------------------------------------------
-          // INPUT
-          // --------------------------------------------------
-
-          buildInputArea(),
+          _buildInputArea(),
         ],
       ),
     );
   }
 
-  // ----------------------------------------------------------
-  // STUDY PANEL
-  // ----------------------------------------------------------
-
-  Widget buildStudyPanel() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        8,
-      ),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0E6FF),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.menu_book,
-                  color: Colors.deepPurple,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Study Mode',
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
+  Widget _buildStudyPanel() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFFEBDDFF),
+              const Color(0xFFF1E9FF),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(17),
+                  ),
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: Color(0xFF673AB7),
+                    size: 32,
                   ),
                 ),
-              ),
-              Switch(
-                value: studyMode,
-                activeColor: Colors.deepPurple,
-                onChanged: loading
-                    ? null
-                    : (value) {
-                        setState(() {
-                          studyMode = value;
-                        });
-                      },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Expanded(
-                child: buildDropdown(
-                  label: 'कक्षा',
-                  value: selectedClass,
-                  items: classes,
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Text(
+                    'Study Mode',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: studyMode,
+                  activeColor: const Color(0xFF673AB7),
                   onChanged: loading
                       ? null
                       : (value) {
-                          if (value == null) return;
-
                           setState(() {
-                            selectedClass = value;
+                            studyMode = value;
                           });
                         },
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: buildDropdown(
-                  label: 'विषय',
-                  value: selectedSubject,
-                  items: subjects,
-                  onChanged: loading
-                      ? null
-                      : (value) {
-                          if (value == null) return;
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _dropdownBox(
+                    label: 'कक्षा',
+                    value: selectedClass,
+                    items: classes,
+                    onChanged: loading
+                        ? null
+                        : (value) {
+                            if (value == null) return;
 
-                          setState(() {
-                            selectedSubject = value;
-                          });
-                        },
+                            setState(() {
+                              selectedClass = value;
+                            });
+                          },
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _dropdownBox(
+                    label: 'विषय',
+                    value: selectedSubject,
+                    items: subjects,
+                    onChanged: loading
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+
+                            setState(() {
+                              selectedSubject = value;
+                            });
+                          },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ----------------------------------------------------------
-  // DROPDOWN
-  // ----------------------------------------------------------
-
-  Widget buildDropdown({
+  Widget _dropdownBox({
     required String label,
     required String value,
     required List<String> items,
     required ValueChanged<String?>? onChanged,
   }) {
-    return DropdownButtonFormField<String>(
-      value: value,
-      isExpanded: true,
+    return InputDecorator(
       decoration: InputDecoration(
         labelText: label,
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 3,
         ),
       ),
-      items: items.map((item) {
-        return DropdownMenuItem<String>(
-          value: item,
-          child: Text(
-            item,
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
-      onChanged: onChanged,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down),
+          items: items.map((item) {
+            return DropdownMenuItem(
+              value: item,
+              child: Text(
+                item,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: onChanged,
+        ),
+      ),
     );
   }
 
-  // ----------------------------------------------------------
-  // WELCOME
-  // ----------------------------------------------------------
+  Widget _buildWelcome() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        children: [
+          const SizedBox(height: 25),
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE7D6FF),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: const Icon(
+              Icons.school_rounded,
+              size: 52,
+              color: Color(0xFF673AB7),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'नमस्ते विद्यार्थी! 👋',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 27,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'मैं आपका AI Personal Teacher हूँ।',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 17,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 22),
+          _suggestion(
+            '📚',
+            'मुझे गणित समझाओ',
+          ),
+          _suggestion(
+            '📝',
+            'आज क्या पढ़ना चाहिए?',
+          ),
+          _suggestion(
+            '📷',
+            'फोटो में दिए सवाल को हल करो',
+          ),
+          _suggestion(
+            '🎤',
+            'माइक दबाकर सवाल बोलें',
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget buildWelcome() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+  Widget _suggestion(String icon, String text) {
+    return GestureDetector(
+      onTap: loading
+          ? null
+          : () {
+              _controller.text = text;
+            },
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 14,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFE5D9F2),
+          ),
+        ),
+        child: Row(
           children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE7D9FF),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Icon(
-                Icons.school,
-                color: Colors.deepPurple,
-                size: 58,
-              ),
-            ),
-
-            const SizedBox(height: 22),
-
-            const Text(
-              'नमस्ते! 👋',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            const Text(
-              'मैं आपका AI Personal Teacher हूँ।',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
             Text(
-              studyMode
-                  ? '$selectedClass • $selectedSubject\n'
-                    'Study Mode चालू है।'
-                  : 'अपना सवाल लिखें, बोलें या फोटो भेजें।',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-                height: 1.5,
+              icon,
+              style: const TextStyle(fontSize: 23),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-
-            const SizedBox(height: 26),
-
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: [
-                buildSuggestion(
-                  '12 + 26 = ?',
-                ),
-                buildSuggestion(
-                  'भारत की राजधानी क्या है?',
-                ),
-                buildSuggestion(
-                  'English बोलना सीखना है',
-                ),
-              ],
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey,
             ),
           ],
         ),
@@ -1423,150 +1038,168 @@ Internet connection और Gemini API key check करें।
     );
   }
 
-  Widget buildSuggestion(String text) {
-    return ActionChip(
-      label: Text(text),
-      onPressed: loading
-          ? null
-          : () {
-              questionController.text = text;
-
-              questionController.selection =
-                  TextSelection.fromPosition(
-                TextPosition(
-                  offset: questionController.text.length,
+  Widget _buildMessage(ChatMessage message) {
+    if (message.isUser) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          constraints: const BoxConstraints(
+            maxWidth: 360,
+          ),
+          margin: const EdgeInsets.only(
+            bottom: 14,
+            left: 35,
+          ),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE4D1FF),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(22),
+              topRight: Radius.circular(22),
+              bottomLeft: Radius.circular(22),
+              bottomRight: Radius.circular(6),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  CircleAvatar(
+                    radius: 17,
+                    backgroundColor: Color(0xFF673AB7),
+                    child: Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  SizedBox(width: 9),
+                  Text(
+                    'आप',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
+                  ),
+                ],
+              ),
+              if (message.imagePath != null) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.file(
+                    File(message.imagePath!),
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              );
-            },
-    );
-  }
-
-  // ----------------------------------------------------------
-  // MESSAGE BUBBLE
-  // ----------------------------------------------------------
-
-  Widget buildMessageBubble(ChatMessage message) {
-    final isUser = message.isUser;
+              ],
+              const SizedBox(height: 10),
+              Text(
+                message.text,
+                style: const TextStyle(
+                  fontSize: 17,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Align(
-      alignment:
-          isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(
-          maxWidth:
-              MediaQuery.of(context).size.width * 0.88,
+        constraints: const BoxConstraints(
+          maxWidth: 380,
         ),
-        margin: EdgeInsets.only(
-          top: 6,
-          bottom: 6,
-          left: isUser ? 55 : 0,
-          right: isUser ? 0 : 35,
+        margin: const EdgeInsets.only(
+          bottom: 14,
+          right: 18,
         ),
-        padding: const EdgeInsets.fromLTRB(
-          16,
-          14,
-          14,
-          12,
-        ),
+        padding: const EdgeInsets.all(17),
         decoration: BoxDecoration(
-          color: isUser
-              ? const Color(0xFFE5D4FF)
-              : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(22),
-            topRight: const Radius.circular(22),
-            bottomLeft: Radius.circular(
-              isUser ? 22 : 6,
-            ),
-            bottomRight: Radius.circular(
-              isUser ? 6 : 22,
-            ),
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(8),
+            topRight: Radius.circular(22),
+            bottomLeft: Radius.circular(22),
+            bottomRight: Radius.circular(22),
           ),
-          border: Border.all(
-            color: isUser
-                ? const Color(0xFFD7BFFF)
-                : const Color(0xFFEAEAEA),
-          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+              color: Colors.black.withOpacity(0.06),
+            ),
+          ],
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: isUser
-                      ? Colors.deepPurple
-                      : const Color(0xFFE7D9FF),
-                  child: Icon(
-                    isUser
-                        ? Icons.person
-                        : Icons.school,
-                    size: 20,
-                    color: isUser
-                        ? Colors.white
-                        : Colors.deepPurple,
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE9D9FF),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: const Icon(
+                    Icons.school,
+                    color: Color(0xFF673AB7),
                   ),
                 ),
-                const SizedBox(width: 9),
-                Text(
-                  isUser ? 'आप' : 'Teacher',
-                  style: const TextStyle(
+                const SizedBox(width: 10),
+                const Text(
+                  'Teacher',
+                  style: TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
                   ),
                 ),
               ],
             ),
-
-            const SizedBox(height: 10),
-
+            const SizedBox(height: 13),
             SelectableText(
               message.text,
               style: const TextStyle(
                 fontSize: 17,
                 height: 1.55,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
-
-            if (!isUser)
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  tooltip: 'सुनें',
-                  onPressed: () {
-                    speak(message.text);
-                  },
-                  icon: Icon(
-                    speaking
-                        ? Icons.stop_circle_outlined
-                        : Icons.volume_up,
-                    color: Colors.deepPurple,
-                    size: 28,
-                  ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: 'सुनें',
+                onPressed: () => _speak(message.text),
+                icon: const Icon(
+                  Icons.volume_up_rounded,
+                  color: Color(0xFF673AB7),
+                  size: 29,
                 ),
               ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // ----------------------------------------------------------
-  // LOADING BUBBLE
-  // ----------------------------------------------------------
-
-  Widget buildLoadingBubble() {
+  Widget _buildLoadingMessage() {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(
-          left: 0,
-          right: 60,
-          top: 8,
-          bottom: 8,
+          bottom: 14,
+          right: 80,
         ),
         padding: const EdgeInsets.symmetric(
           horizontal: 18,
@@ -1574,39 +1207,24 @@ Internet connection और Gemini API key check करें।
         ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFEAEAEA),
-          ),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircleAvatar(
-              radius: 17,
-              backgroundColor: Color(0xFFE7D9FF),
-              child: Icon(
-                Icons.school,
-                color: Colors.deepPurple,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              studyMode
-                  ? 'Teacher समझा रहा है...'
-                  : 'Teacher जवाब दे रहा है...',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 10),
-            const SizedBox(
-              width: 18,
-              height: 18,
+            SizedBox(
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
+                strokeWidth: 2.5,
+                color: Color(0xFF673AB7),
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Teacher सोच रहा है...',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -1615,11 +1233,7 @@ Internet connection और Gemini API key check करें।
     );
   }
 
-  // ----------------------------------------------------------
-  // INPUT AREA
-  // ----------------------------------------------------------
-
-  Widget buildInputArea() {
+  Widget _buildInputArea() {
     return SafeArea(
       top: false,
       child: Container(
@@ -1627,160 +1241,139 @@ Internet connection और Gemini API key check करें।
           10,
           8,
           10,
-          8,
+          10,
         ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               blurRadius: 12,
-              offset: const Offset(0, -2),
-              color: Colors.black.withOpacity(0.06),
+              offset: const Offset(0, -3),
+              color: Colors.black.withOpacity(0.05),
             ),
           ],
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             if (selectedImage != null)
-              buildSelectedImage(),
-
+              Container(
+                margin: const EdgeInsets.only(
+                  bottom: 8,
+                ),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0E7FF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        File(selectedImage!.path),
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'फोटो तैयार है। सवाल भेजें।',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: loading
+                          ? null
+                          : () {
+                              setState(() {
+                                selectedImage = null;
+                              });
+                            },
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
             Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Camera / gallery
                 IconButton(
-                  tooltip: 'Photo',
-                  onPressed:
-                      loading ? null : showImageOptions,
+                  tooltip: 'फोटो लें',
+                  onPressed: loading ? null : _pickImage,
                   icon: const Icon(
                     Icons.add_a_photo_outlined,
                     size: 30,
+                    color: Color(0xFF673AB7),
                   ),
                 ),
-
-                // Text field
                 Expanded(
-                  child: TextField(
-                    controller: questionController,
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction:
-                        TextInputAction.newline,
-                    enabled: !loading,
-                    decoration: InputDecoration(
-                      hintText: listening
-                          ? '🎤 सुन रहा हूँ...'
-                          : 'अपना सवाल लिखें...',
-                      filled: true,
-                      fillColor:
-                          const Color(0xFFF7F1FF),
-                      contentPadding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 13,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minHeight: 52,
+                      maxHeight: 130,
                     ),
-                    onSubmitted: (_) {
-                      if (!loading) {
-                        askTeacher();
-                      }
-                    },
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF4ECFF),
+                      borderRadius: BorderRadius.circular(27),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 5,
+                      textCapitalization:
+                          TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        hintText: 'अपना सवाल लिखें...',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 15,
+                        ),
+                      ),
+                      onSubmitted: (_) {
+                        if (!loading) {
+                          _sendMessage();
+                        }
+                      },
+                    ),
                   ),
                 ),
-
-                // Mic
                 IconButton(
-                  tooltip: 'Voice',
-                  onPressed:
-                      loading ? null : startListening,
+                  tooltip: listening
+                      ? 'Mic बंद करें'
+                      : 'बोलकर सवाल पूछें',
+                  onPressed: loading
+                      ? null
+                      : _startListening,
                   icon: Icon(
                     listening
                         ? Icons.mic
-                        : Icons.mic_none,
+                        : Icons.mic_none_rounded,
                     size: 31,
                     color: listening
                         ? Colors.red
-                        : Colors.deepPurple,
+                        : const Color(0xFF673AB7),
                   ),
                 ),
-
-                // Send
                 IconButton(
-                  tooltip: 'Send',
-                  onPressed:
-                      loading ? null : askTeacher,
-                  icon: Icon(
-                    Icons.send,
+                  tooltip: 'सवाल भेजें',
+                  onPressed: loading
+                      ? null
+                      : _sendMessage,
+                  icon: const Icon(
+                    Icons.send_rounded,
                     size: 34,
-                    color: loading
-                        ? Colors.grey
-                        : Colors.deepPurple,
+                    color: Color(0xFF673AB7),
                   ),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ----------------------------------------------------------
-  // SELECTED IMAGE PREVIEW
-  // ----------------------------------------------------------
-
-  Widget buildSelectedImage() {
-    return Container(
-      height: 90,
-      margin: const EdgeInsets.only(
-        left: 8,
-        right: 8,
-        bottom: 8,
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius:
-                BorderRadius.circular(14),
-            child: Image.file(
-              File(selectedImage!.path),
-              width: 90,
-              height: 90,
-              fit: BoxFit.cover,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          const Expanded(
-            child: Text(
-              'यह फोटो सवाल के साथ भेजी जाएगी।',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          IconButton(
-            onPressed: loading
-                ? null
-                : () {
-                    setState(() {
-                      selectedImage = null;
-                    });
-                  },
-            icon: const Icon(
-              Icons.close,
-            ),
-          ),
-        ],
       ),
     );
   }
