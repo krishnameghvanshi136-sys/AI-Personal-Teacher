@@ -8,7 +8,6 @@ permissions:
 
 jobs:
   build:
-    name: Build AI Personal Teacher APK
     runs-on: ubuntu-latest
 
     steps:
@@ -21,66 +20,60 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Android project
+      - name: Create Android Flutter project
         run: |
           rm -rf app
           flutter create --platforms=android app
           cp pubspec.yaml app/pubspec.yaml
 
-      - name: Copy Flutter source
+      - name: Copy app source
         run: |
           rm -rf app/lib
-          rm -rf app/test
           cp -r lib app/lib
 
-      - name: Add Android permissions
+      - name: Remove test files
         run: |
-          MANIFEST="app/android/app/src/main/AndroidManifest.xml"
+          rm -rf app/test
 
-          sed -i 's#<manifest#<manifest#' "$MANIFEST"
-
-          grep -q 'android.permission.INTERNET' "$MANIFEST" || \
-            sed -i '2i\    <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
-
-          grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST" || \
-            sed -i '2i\    <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
-
-          grep -q 'android.permission.CAMERA' "$MANIFEST" || \
-            sed -i '2i\    <uses-permission android:name="android.permission.CAMERA"/>' "$MANIFEST"
-
-      - name: Check Gemini API Key
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Add Internet permission
         run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "ERROR: GEMINI_API_KEY Secret नहीं मिला!"
-            echo "GitHub Settings > Secrets and variables > Actions check करें."
-            exit 1
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
 
-          echo "GEMINI_API_KEY Secret मौजूद है."
+          manifest = Path(
+              "app/android/app/src/main/AndroidManifest.xml"
+          )
+
+          text = manifest.read_text()
+
+          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+
+          if permission not in text:
+              text = text.replace(
+                  '<manifest',
+                  '<manifest\n    ' + permission,
+                  1
+              )
+
+          manifest.write_text(text)
+          PY
 
       - name: Get dependencies
         working-directory: app
-        run: |
-          flutter pub get
+        run: flutter pub get
 
-      - name: Flutter Analyze
+      - name: Analyze Flutter project
         working-directory: app
-        run: |
-          flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: flutter analyze
 
       - name: Build Release APK
         working-directory: app
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           flutter build apk --release \
-            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
+            --dart-define=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
           path: app/build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
