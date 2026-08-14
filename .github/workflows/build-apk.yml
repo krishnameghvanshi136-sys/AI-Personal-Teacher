@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build AI Personal Teacher APK
 
 on:
   workflow_dispatch:
@@ -20,19 +20,18 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Android project
+      - name: Check project files
         run: |
-          rm -rf app
-          flutter create --platforms=android app
-          cp pubspec.yaml app/pubspec.yaml
-          cp -r lib app/lib
+          echo "Project files:"
+          ls -la
+          echo "Checking main.dart:"
+          ls -la lib/main.dart
 
-      - name: Remove default Flutter test
+      - name: Configure Android project
         run: |
-          rm -rf app/test
+          flutter create --platforms=android .
 
       - name: Configure Android permissions
-        working-directory: app
         shell: bash
         run: |
           python3 - <<'PY'
@@ -83,21 +82,19 @@ jobs:
               )
 
           manifest.write_text(text)
+
           print("Android permissions configured successfully.")
           PY
 
       - name: Get dependencies
-        working-directory: app
         run: |
           flutter pub get
 
       - name: Analyze Flutter project
-        working-directory: app
         run: |
           flutter analyze --no-fatal-infos
 
       - name: Build Release APK
-        working-directory: app
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -108,4 +105,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
-          path: app/build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
