@@ -35,13 +35,11 @@ class ChatMessage {
   final String text;
   final bool isUser;
   final Uint8List? imageBytes;
-  final String? imageMimeType;
 
-  const ChatMessage({
+  ChatMessage({
     required this.text,
     required this.isUser,
     this.imageBytes,
-    this.imageMimeType,
   });
 }
 
@@ -59,6 +57,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
 
   static const String apiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
+    defaultValue: '',
   );
 
   static const String modelName = 'gemini-2.5-flash';
@@ -92,19 +91,18 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   bool _loading = false;
   bool _listening = false;
   bool _speechAvailable = false;
-  bool _studyMode = false;
+  bool _studyMode = true;
 
   String _selectedClass = 'कक्षा 5';
   String _selectedSubject = 'गणित';
   String _selectedTopic = '';
 
   Uint8List? _selectedImage;
-  String? _selectedImageMimeType;
 
   final List<ChatMessage> _messages = [];
 
   // ============================================================
-  // CLASS LIST
+  // CLASSES
   // ============================================================
 
   final List<String> _classes = const [
@@ -123,7 +121,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   ];
 
   // ============================================================
-  // SUBJECT LIST
+  // SUBJECTS
   // ============================================================
 
   final List<String> _subjects = const [
@@ -164,1648 +162,140 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       model: modelName,
       apiKey: apiKey,
       systemInstruction: Content.system(
-        r'''
-आप "AI Personal Teacher" नाम के एक डिजिटल शिक्षक हैं।
+        '''
+आप "AI Personal Teacher" हैं।
 
-आपका काम बच्चों को उनकी कक्षा, विषय और चुने हुए Topic के अनुसार पढ़ाना है।
+आपका मुख्य काम विद्यार्थी को उसकी चुनी हुई कक्षा,
+विषय और अध्याय के स्तर के अनुसार पढ़ाना है।
 
-मुख्य नियम:
+==================================================
+सबसे महत्वपूर्ण नियम
+==================================================
 
-1. विद्यार्थी की चुनी हुई कक्षा के स्तर के अनुसार उत्तर दें।
+विद्यार्थी की चुनी हुई जानकारी:
 
-2. छोटी कक्षा के विद्यार्थी के लिए:
-- बहुत आसान भाषा इस्तेमाल करें।
-- छोटे वाक्यों का उपयोग करें।
-- आसान उदाहरण दें।
-- कठिन शब्दों का अर्थ समझाएँ।
+कक्षा: $_selectedClass
+विषय: $_selectedSubject
+Topic: ${_selectedTopic.trim().isEmpty ? 'कोई विशेष Topic नहीं' : _selectedTopic}
 
-3. बड़ी कक्षा के लिए:
-- जरूरत के अनुसार विस्तृत उत्तर दें।
-- लेकिन अनावश्यक कठिन भाषा न इस्तेमाल करें।
+इस जानकारी को हर उत्तर में ध्यान में रखें।
 
-भाषा:
-
-विद्यार्थी Hindi में पूछे तो Hindi में जवाब दें।
-
-विद्यार्थी Hinglish में पूछे तो आसान Hindi या Hinglish में जवाब दें।
-
-विद्यार्थी English में पूछे तो English में जवाब दें।
-
-उत्तर:
-
-सबसे पहले सवाल का सीधा उत्तर दें।
-
-अगर सवाल छोटा है तो छोटा और सीधा उत्तर दें।
-
-अगर विद्यार्थी "समझाओ", "कैसे", "क्यों" या "पूरा समझाओ" कहता है तो step-by-step समझाएँ।
-
-गणित में:
-
-1. दिए गए तथ्य लिखें।
-2. Formula या तरीका बताएं।
-3. Calculation करें।
-4. अंतिम उत्तर साफ लिखें।
+विद्यार्थी को उसी कक्षा के विद्यार्थी की तरह समझाएँ।
 
 उदाहरण:
 
-दूरी = 100 किलोमीटर
-समय = 1 घंटा
+कक्षा 3 है तो कक्षा 3 के स्तर का उत्तर दें।
 
-चाल = दूरी ÷ समय
+कक्षा 8 है तो कक्षा 8 के स्तर का उत्तर दें।
 
-चाल = 100 ÷ 1
+कक्षा 10 है तो कक्षा 10 के स्तर का उत्तर दें।
 
-चाल = 100 किलोमीटर प्रति घंटा
+कक्षा 12 है तो कक्षा 12 के स्तर का उत्तर दें।
 
-उत्तर: 100 किलोमीटर प्रति घंटा
+==================================================
+LANGUAGE
+==================================================
 
-Study Mode:
+विद्यार्थी जिस भाषा में सवाल पूछता है,
+उसी भाषा में जवाब दें।
 
-अगर Study Mode ON है:
+Hindi में सवाल:
+आसान Hindi में जवाब दें।
 
-- विद्यार्थी को शिक्षक की तरह पढ़ाएँ।
-- Concept को आसान भाषा में समझाएँ।
-- जरूरत होने पर उदाहरण दें।
-- जरूरत होने पर छोटा अभ्यास दें।
-- लेकिन हर जवाब के अंत में जबरदस्ती नया सवाल न पूछें।
+Hinglish में सवाल:
+आसान Hindi/Hinglish में जवाब दें।
 
-अगर विद्यार्थी factual question पूछता है तो सीधे सही उत्तर दें।
+English में सवाल:
+English में जवाब दें।
 
-Class और Subject:
+==================================================
+CLASS-WISE TEACHING
+==================================================
 
-हमेशा ध्यान रखें:
+कक्षा 1 से 3:
 
-कक्षा
-विषय
-Topic
+बहुत आसान भाषा रखें।
+छोटे वाक्य रखें।
+बच्चों के रोजमर्रा के उदाहरण दें।
 
-उदाहरण:
+कक्षा 4 से 5:
 
-कक्षा: कक्षा 5
-विषय: गणित
-Topic: भिन्न
+सरल explanation दें।
+छोटे step दें।
+उदाहरण जरूर दें जब जरूरत हो।
 
-तो उत्तर कक्षा 5 के स्तर का होना चाहिए।
+कक्षा 6 से 8:
 
-सामान्य प्रश्न:
+Concept को स्पष्ट तरीके से समझाएँ।
+जरूरत के अनुसार formula और examples दें।
 
-अगर विद्यार्थी सामान्य जानकारी का सवाल पूछता है तो सही और सरल उत्तर दें।
+कक्षा 9 से 10:
 
-उदाहरण:
+School examination level का explanation दें।
+Definition, formula, steps और examples जरूरत के अनुसार दें।
 
-प्रश्न:
-भारत की राजधानी क्या है?
+कक्षा 11 से 12:
 
-उत्तर:
-भारत की राजधानी नई दिल्ली है।
+Concept को अधिक स्पष्ट और academic तरीके से समझाएँ।
+जरूरत होने पर detailed explanation दें।
+लेकिन विद्यार्थी के सवाल से ज्यादा लंबा उत्तर न दें।
 
-Image:
+==================================================
+SUBJECT-WISE TEACHING
+==================================================
 
-अगर विद्यार्थी image भेजता है:
+गणित:
 
-- Image को ध्यान से देखें।
-- Homework या question है तो उसे पढ़कर हल करें।
-- Image साफ नहीं है तो बताएं कि image साफ दिखाई नहीं दे रही।
-
-गलत उत्तर:
-
-अगर विद्यार्थी गलत उत्तर देता है तो उसे डांटें नहीं।
-
-कहें:
-
-कोई बात नहीं, इसे एक बार सही तरीके से समझते हैं।
-
-Formatting:
-
-Markdown formatting का उपयोग न करें।
-
-इनका उपयोग बिल्कुल न करें:
-
-**
-***
-###
-##
-$
-$$
-\div
-\frac
-
-LaTeX mathematics का उपयोग न करें।
-
-सामान्य symbols इस्तेमाल करें:
-
-÷
-×
-=
-+
-−
-≥
-≤
+Calculation step-by-step दिखाएँ।
 
 उदाहरण:
 
-गलत:
-$2500 \div 25$
+25 × 4 = 100
 
-सही:
-2500 ÷ 25 = 100
+250 ÷ 25 = 10
 
-गलत:
-**उत्तर: 100**
+Formula और final answer साफ रखें।
 
-सही:
-उत्तर: 100
+विज्ञान:
 
-गलत:
-### उत्तर
+पहले concept समझाएँ।
+फिर आसान उदाहरण दें।
+जरूरत हो तो कारण और परिणाम बताएं।
 
-सही:
-उत्तर
+हिंदी:
 
-Meta talk:
+व्याकरण, पाठ, शब्दार्थ और प्रश्नों को कक्षा के अनुसार समझाएँ।
 
-बिना जरूरत यह न लिखें:
+अंग्रेजी:
 
-उत्तर आएगा
-अब आपकी बारी
-क्या आप इसका उत्तर बता सकते हैं?
-चलो challenge करते हैं
+Grammar और English concepts को आसान तरीके से समझाएँ।
+जरूरत होने पर Hindi में meaning दें।
 
-जब तक विद्यार्थी अभ्यास प्रश्न न मांगे, नया सवाल न बनाएं।
+इतिहास:
 
-AI के बारे में meta discussion न करें।
+तथ्य सही रखें।
+घटनाओं को आसान क्रम में समझाएँ।
 
-सीधे शिक्षक की तरह मदद करें।
+भूगोल:
 
-हर उत्तर:
+स्थान, कारण और उदाहरणों के साथ समझाएँ।
 
-सही
-स्पष्ट
-कक्षा के अनुसार
-विषय के अनुसार
-सरल
-और उपयोगी होना चाहिए।
-''',
-      ),
-    );
+सामाजिक विज्ञान:
 
-    _chat = _model!.startChat();
-  }
+Civics, History और Geography के सवालों को विद्यार्थी की कक्षा के अनुसार समझाएँ।
 
-  // ============================================================
-  // SPEECH INITIALIZATION
-  // ============================================================
+कंप्यूटर:
 
-  Future<void> _initializeSpeech() async {
-    try {
-      final available = await _speech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
+Technical शब्दों को आसान भाषा में समझाएँ।
 
-          if (status == 'notListening') {
-            setState(() {
-              _listening = false;
-            });
-          }
-        },
-        onError: (error) {
-          if (!mounted) return;
+सामान्य ज्ञान:
 
-          setState(() {
-            _listening = false;
-          });
-        },
-      );
+सीधा और सही उत्तर दें।
 
-      if (!mounted) return;
+==================================================
+STUDY MODE
+==================================================
 
-      setState(() {
-        _speechAvailable = available;
-      });
-    } catch (_) {
-      if (!mounted) return;
+Study Mode ON है।
 
-      setState(() {
-        _speechAvailable = false;
-      });
-    }
-  }
-
-  // ============================================================
-  // TTS
-  // ============================================================
-
-  Future<void> _initializeTts() async {
-    try {
-      await _tts.setSpeechRate(0.48);
-      await _tts.setVolume(1.0);
-      await _tts.setPitch(1.0);
-    } catch (_) {}
-  }
-
-  // ============================================================
-  // TEACHER CONTEXT
-  // ============================================================
-
-  String _teacherContext() {
-    final topic = _selectedTopic.trim();
-
-    return [
-      'वर्तमान विद्यार्थी:',
-      '',
-      'कक्षा: $_selectedClass',
-      'विषय: $_selectedSubject',
-      'अध्याय/Topic: '
-          '${topic.isEmpty ? 'कोई विशेष topic नहीं चुना गया' : topic}',
-      'Study Mode: ${_studyMode ? 'ON' : 'OFF'}',
-      '',
-      'ऊपर दी गई जानकारी के अनुसार विद्यार्थी को जवाब दें।',
-    ].join('\n');
-  }
-
-  // ============================================================
-  // CLEAN ANSWER
-  // ============================================================
-
-  String _cleanAnswer(String text) {
-    var answer = text.trim();
-
-    answer = answer.replaceAll('###', '');
-    answer = answer.replaceAll('##', '');
-    answer = answer.replaceAll('#', '');
-
-    answer = answer.replaceAll('***', '');
-    answer = answer.replaceAll('**', '');
-    answer = answer.replaceAll('__', '');
-
-    answer = answer.replaceAll(r'$$', '');
-    answer = answer.replaceAll(r'$', '');
-
-    answer = answer.replaceAll(r'\div', '÷');
-    answer = answer.replaceAll(r'\times', '×');
-    answer = answer.replaceAll(r'\cdot', '×');
-    answer = answer.replaceAll(r'\pm', '±');
-    answer = answer.replaceAll(r'\geq', '≥');
-    answer = answer.replaceAll(r'\leq', '≤');
-
-    answer = answer.replaceAll(r'\(', '');
-    answer = answer.replaceAll(r'\)', '');
-    answer = answer.replaceAll(r'\[', '');
-    answer = answer.replaceAll(r'\]', '');
-
-    answer = answer.replaceAll(
-      'उत्तर आएगा:',
-      '',
-    );
-
-    answer = answer.replaceAll(
-      'अब आपकी बारी:',
-      '',
-    );
-
-    answer = answer.replaceAll(
-      'अब आपकी बारी',
-      '',
-    );
-
-    answer = answer.replaceAll(
-      RegExp(r'\n{3,}'),
-      '\n\n',
-    );
-
-    return answer.trim();
-  }
-
-  // ============================================================
-  // SEND MESSAGE
-  // ============================================================
-
-  Future<void> _sendMessage() async {
-    final question = _textController.text.trim();
-
-    if (question.isEmpty && _selectedImage == null) {
-      return;
-    }
-
-    if (_loading) {
-      return;
-    }
-
-    if (_model == null || _chat == null) {
-      _showMessage(
-        'Gemini API key उपलब्ध नहीं है।',
-      );
-      return;
-    }
-
-    final finalQuestion = question.isEmpty
-        ? 'इस image में दिए गए सवाल को देखकर आसान भाषा में हल करें।'
-        : question;
-
-    final imageForMessage = _selectedImage;
-    final imageMimeType = _selectedImageMimeType;
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          text: finalQuestion,
-          isUser: true,
-          imageBytes: imageForMessage,
-          imageMimeType: imageMimeType,
-        ),
-      );
-
-      _textController.clear();
-      _selectedImage = null;
-      _selectedImageMimeType = null;
-      _loading = true;
-    });
-
-    _scrollToBottom();
-
-    try {
-      final promptText = [
-        _teacherContext(),
-        '',
-        'विद्यार्थी का सवाल:',
-        '',
-        finalQuestion,
-        '',
-        'अब सिर्फ विद्यार्थी के सवाल का उपयोगी उत्तर दें।',
-        '',
-        'नियम:',
-        '- सरल रखें।',
-        '- चुनी हुई कक्षा के स्तर का रखें।',
-        '- सीधे सवाल का जवाब दें।',
-        '- जरूरत होने पर step-by-step समझाएँ।',
-        '- Markdown या LaTeX का उपयोग न करें।',
-        r'- $ या ** या ### का उपयोग न करें।',
-        '- बिना जरूरत नया सवाल न पूछें।',
-        '- बिना जरूरत motivational speech न दें।',
-      ].join('\n');
-
-      GenerateContentResponse response;
-
-      if (imageForMessage != null) {
-        final mimeType =
-            imageMimeType ?? 'image/jpeg';
-
-        response = await _chat!.sendMessage(
-          Content.multi(
-            [
-              TextPart(promptText),
-              DataPart(
-                mimeType,
-                imageForMessage,
-              ),
-            ],
-          ),
-        );
-      } else {
-        response = await _chat!.sendMessage(
-          Content.text(promptText),
-        );
-      }
-
-      if (!mounted) return;
-
-      final rawAnswer = response.text;
-
-      if (rawAnswer == null ||
-          rawAnswer.trim().isEmpty) {
-        setState(() {
-          _messages.add(
-            const ChatMessage(
-              text:
-                  'अभी जवाब नहीं मिल पाया। कृपया दोबारा कोशिश करें।',
-              isUser: false,
-            ),
-          );
-        });
-      } else {
-        final answer =
-            _cleanAnswer(rawAnswer);
-
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              text: answer,
-              isUser: false,
-            ),
-          );
-        });
-      }
-    } catch (error) {
-      if (!mounted) return;
-
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            text: _friendlyError(error),
-            isUser: false,
-          ),
-        );
-      });
-    } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _loading = false;
-      });
-
-      _scrollToBottom();
-    }
-  }
-
-  // ============================================================
-  // ERROR MESSAGE
-  // ============================================================
-
-  String _friendlyError(Object error) {
-    final message =
-        error.toString().toLowerCase();
-
-    if (message.contains('invalidapikey') ||
-        message.contains('invalid api key') ||
-        message.contains('api key') ||
-        message.contains('401')) {
-      return [
-        'Gemini API key में समस्या है।',
-        '',
-        'GitHub Secrets में GEMINI_API_KEY check करें।',
-      ].join('\n');
-    }
-
-    if (message.contains('404') ||
-        message.contains('not_found') ||
-        message.contains('not found')) {
-      return [
-        'Gemini model उपलब्ध नहीं है।',
-        '',
-        'Model: gemini-2.5-flash',
-      ].join('\n');
-    }
-
-    if (message.contains('429') ||
-        message.contains('resource_exhausted')) {
-      return [
-        'Gemini API की request limit पूरी हो गई है।',
-        '',
-        'कुछ समय बाद दोबारा कोशिश करें।',
-      ].join('\n');
-    }
-
-    if (message.contains('socketexception') ||
-        message.contains('failed host lookup') ||
-        message.contains('network')) {
-      return [
-        'Internet connection की समस्या है।',
-        '',
-        'Internet ON करके दोबारा कोशिश करें।',
-      ].join('\n');
-    }
-
-    return [
-      'जवाब नहीं मिल पाया।',
-      '',
-      'Internet connection और Gemini API key check करें।',
-    ].join('\n');
-  }
-
-  // ============================================================
-  // VOICE INPUT
-  // ============================================================
-
-  Future<void> _toggleListening() async {
-    if (_loading) return;
-
-    if (!_speechAvailable) {
-      _showMessage(
-        'Mic उपलब्ध नहीं है। Microphone permission check करें।',
-      );
-      return;
-    }
-
-    if (_listening) {
-      await _speech.stop();
-
-      if (!mounted) return;
-
-      setState(() {
-        _listening = false;
-      });
-
-      return;
-    }
-
-    try {
-      final locales =
-          await _speech.locales();
-
-      String? localeId;
-
-      for (final locale in locales) {
-        final id =
-            locale.localeId.toLowerCase();
-
-        if (id == 'hi_in' ||
-            id == 'hi-in') {
-          localeId =
-              locale.localeId;
-          break;
-        }
-      }
-
-      localeId ??= 'en_IN';
-
-      if (!mounted) return;
-
-      setState(() {
-        _listening = true;
-      });
-
-      await _speech.listen(
-        onResult: (result) {
-          if (!mounted) return;
-
-          setState(() {
-            _textController.text =
-                result.recognizedWords;
-
-            _textController.selection =
-                TextSelection.fromPosition(
-              TextPosition(
-                offset:
-                    _textController.text.length,
-              ),
-            );
-          });
-
-          if (result.finalResult) {
-            setState(() {
-              _listening = false;
-            });
-          }
-        },
-        listenOptions:
-            stt.SpeechListenOptions(
-          partialResults: true,
-          cancelOnError: true,
-          localeId: localeId,
-          listenMode:
-              stt.ListenMode.dictation,
-          autoPunctuation: true,
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _listening = false;
-      });
-
-      _showMessage(
-        'Voice input शुरू नहीं हो पाया। Microphone permission check करें।',
-      );
-    }
-  }
-
-  // ============================================================
-  // IMAGE PICKER
-  // ============================================================
-
-  Future<void> _pickImage() async {
-    if (_loading) return;
-
-    try {
-      final image =
-          await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-        maxWidth: 1600,
-      );
-
-      if (image == null) return;
-
-      final bytes =
-          await image.readAsBytes();
-
-      if (!mounted) return;
-
-      setState(() {
-        _selectedImage = bytes;
-        _selectedImageMimeType =
-            image.mimeType ?? 'image/jpeg';
-      });
-    } catch (_) {
-      _showMessage(
-        'Image select नहीं हो पाई।',
-      );
-    }
-  }
-
-  // ============================================================
-  // TTS
-  // ============================================================
-
-  Future<void> _speak(String text) async {
-    try {
-      await _tts.stop();
-
-      final isHindi =
-          RegExp(
-            r'[\u0900-\u097F]',
-          ).hasMatch(text);
-
-      await _tts.setLanguage(
-        isHindi ? 'hi-IN' : 'en-IN',
-      );
-
-      await _tts.speak(text);
-    } catch (_) {
-      _showMessage(
-        'Voice playback उपलब्ध नहीं है।',
-      );
-    }
-  }
-
-  // ============================================================
-  // NEW CHAT
-  // ============================================================
-
-  void _newChat() {
-    setState(() {
-      _messages.clear();
-      _selectedTopic = '';
-      _selectedImage = null;
-      _selectedImageMimeType = null;
-    });
-
-    if (_model != null) {
-      _chat = _model!.startChat();
-    }
-  }
-
-  // ============================================================
-  // RESTART CHAT
-  // ============================================================
-
-  void _restartChatOnly() {
-    if (_model != null) {
-      _chat = _model!.startChat();
-    }
-
-    if (_messages.isNotEmpty) {
-      setState(() {
-        _messages.clear();
-      });
-    }
-  }
-
-  // ============================================================
-  // TOPIC
-  // ============================================================
-
-  Future<void> _editTopic() async {
-    final controller =
-        TextEditingController(
-      text: _selectedTopic,
-    );
-
-    final result =
-        await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'अध्याय / Topic',
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration:
-                const InputDecoration(
-              hintText:
-                  'जैसे: भिन्न, प्रकाश, Grammar...',
-              border:
-                  OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('रद्द'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(
-                  context,
-                  controller.text.trim(),
-                );
-              },
-              child:
-                  const Text('सेट करें'),
-            ),
-          ],
-        );
-      },
-    );
-
-    controller.dispose();
-
-    if (result == null) return;
-
-    setState(() {
-      _selectedTopic = result;
-    });
-
-    _restartChatOnly();
-  }
-
-  // ============================================================
-  // DROPDOWN
-  // ============================================================
-
-  Widget _dropdownBox({
-    required String label,
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Expanded(
-      child:
-          DropdownButtonFormField<String>(
-        initialValue: value,
-        isExpanded: true,
-        decoration:
-            InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: Colors.white,
-          border:
-              OutlineInputBorder(
-            borderRadius:
-                BorderRadius.circular(20),
-            borderSide:
-                BorderSide.none,
-          ),
-        ),
-        items: items
-            .map(
-              (item) =>
-                  DropdownMenuItem<String>(
-                value: item,
-                child: Text(
-                  item,
-                  overflow:
-                      TextOverflow.ellipsis,
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  // ============================================================
-  // STUDY PANEL
-  // ============================================================
-
-  Widget _buildStudyPanel() {
-    return Container(
-      margin:
-          const EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        8,
-      ),
-      padding:
-          const EdgeInsets.all(16),
-      decoration:
-          BoxDecoration(
-        gradient:
-            const LinearGradient(
-          colors: [
-            Color(0xFFE9D8FF),
-            Color(0xFFF2E8FF),
-          ],
-        ),
-        borderRadius:
-            BorderRadius.circular(28),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration:
-                    BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(
-                    18,
-                  ),
-                ),
-                child:
-                    const Icon(
-                  Icons.menu_book_rounded,
-                  color:
-                      Color(0xFF673AB7),
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
-                  'Study Mode',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight:
-                        FontWeight.w800,
-                  ),
-                ),
-              ),
-              Switch(
-                value: _studyMode,
-                onChanged: (value) {
-                  setState(() {
-                    _studyMode = value;
-                  });
-
-                  _restartChatOnly();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _dropdownBox(
-                label: 'कक्षा',
-                value: _selectedClass,
-                items: _classes,
-                onChanged: (value) {
-                  if (value == null) return;
-
-                  setState(() {
-                    _selectedClass =
-                        value;
-                  });
-
-                  _restartChatOnly();
-                },
-              ),
-              const SizedBox(width: 12),
-              _dropdownBox(
-                label: 'विषय',
-                value: _selectedSubject,
-                items: _subjects,
-                onChanged: (value) {
-                  if (value == null) return;
-
-                  setState(() {
-                    _selectedSubject =
-                        value;
-                  });
-
-                  _restartChatOnly();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          InkWell(
-            borderRadius:
-                BorderRadius.circular(20),
-            onTap: _editTopic,
-            child: Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 17,
-              ),
-              decoration:
-                  BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.menu_book_outlined,
-                    color:
-                        Color(0xFF673AB7),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _selectedTopic.isEmpty
-                          ? 'अध्याय / Topic (वैकल्पिक)'
-                          : _selectedTopic,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight:
-                            FontWeight.w600,
-                        color:
-                            _selectedTopic.isEmpty
-                                ? Colors
-                                    .grey
-                                    .shade700
-                                : Colors
-                                    .black87,
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.edit_outlined,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // MESSAGE
-  // ============================================================
-
-  Widget _buildMessage(
-    ChatMessage message,
-  ) {
-    final isUser =
-        message.isUser;
-
-    return Align(
-      alignment: isUser
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
-      child: Container(
-        constraints:
-            BoxConstraints(
-          maxWidth:
-              MediaQuery.of(context)
-                      .size
-                      .width *
-                  0.88,
-        ),
-        margin:
-            const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 7,
-        ),
-        padding:
-            const EdgeInsets.all(16),
-        decoration:
-            BoxDecoration(
-          color: isUser
-              ? const Color(
-                  0xFFE3CCFF,
-                )
-              : Colors.white,
-          borderRadius:
-              BorderRadius.only(
-            topLeft:
-                const Radius.circular(22),
-            topRight:
-                const Radius.circular(22),
-            bottomLeft:
-                Radius.circular(
-              isUser ? 22 : 5,
-            ),
-            bottomRight:
-                Radius.circular(
-              isUser ? 5 : 22,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 12,
-              offset:
-                  const Offset(0, 4),
-              color:
-                  Colors.black.withValues(
-                alpha: 0.06,
-              ),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor:
-                      isUser
-                          ? const Color(
-                              0xFF673AB7,
-                            )
-                          : const Color(
-                              0xFFE9D8FF,
-                            ),
-                  child: Icon(
-                    isUser
-                        ? Icons.person
-                        : Icons.school_rounded,
-                    color: isUser
-                        ? Colors.white
-                        : const Color(
-                            0xFF673AB7,
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  isUser
-                      ? 'आप'
-                      : 'Teacher',
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w800,
-                    fontSize: 17,
-                  ),
-                ),
-              ],
-            ),
-            if (message.imageBytes !=
-                null) ...[
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(
-                  16,
-                ),
-                child: Image.memory(
-                  message.imageBytes!,
-                  width:
-                      double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            SelectableText(
-              message.text,
-              style:
-                  const TextStyle(
-                fontSize: 18,
-                height: 1.5,
-                fontWeight:
-                    FontWeight.w500,
-              ),
-            ),
-            if (!isUser) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment:
-                    Alignment.centerRight,
-                child:
-                    IconButton(
-                  onPressed:
-                      () => _speak(
-                    message.text,
-                  ),
-                  icon:
-                      const Icon(
-                    Icons
-                        .volume_up_rounded,
-                    color:
-                        Color(0xFF673AB7),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding:
-            const EdgeInsets.all(30),
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 90,
-              height: 90,
-              decoration:
-                  BoxDecoration(
-                color:
-                    const Color(
-                  0xFFE9D8FF,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  28,
-                ),
-              ),
-              child:
-                  const Icon(
-                Icons.school_rounded,
-                size: 52,
-                color:
-                    Color(0xFF673AB7),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'नमस्ते! 👋',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight:
-                    FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'मैं आपका digital teacher हूँ।\n'
-              'कोई भी सवाल पूछिए।',
-              textAlign:
-                  TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
-                height: 1.5,
-                color:
-                    Colors.grey.shade700,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // INPUT
-  // ============================================================
-
-  Widget _buildInputArea() {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding:
-            const EdgeInsets.fromLTRB(
-          12,
-          8,
-          12,
-          10,
-        ),
-        decoration:
-            BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 14,
-              offset:
-                  const Offset(0, -4),
-              color:
-                  Colors.black.withValues(
-                alpha: 0.06,
-              ),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            if (_selectedImage !=
-                null)
-              Container(
-                margin:
-                    const EdgeInsets.only(
-                  bottom: 8,
-                ),
-                height: 80,
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        14,
-                      ),
-                      child:
-                          Image.memory(
-                        _selectedImage!,
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      right: -5,
-                      top: -5,
-                      child:
-                          IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedImage =
-                                null;
-                            _selectedImageMimeType =
-                                null;
-                          });
-                        },
-                        style:
-                            IconButton
-                                .styleFrom(
-                          backgroundColor:
-                              Colors.white,
-                        ),
-                        icon:
-                            const Icon(
-                          Icons.close,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  onPressed:
-                      _loading
-                          ? null
-                          : _pickImage,
-                  icon:
-                      const Icon(
-                    Icons
-                        .add_a_photo_outlined,
-                    size: 30,
-                    color:
-                        Color(0xFF673AB7),
-                  ),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller:
-                        _textController,
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction:
-                        TextInputAction
-                            .newline,
-                    decoration:
-                        InputDecoration(
-                      hintText:
-                          _listening
-                              ? '🎤 सुन रहा हूँ...'
-                              : 'अपना सवाल लिखें...',
-                      filled: true,
-                      fillColor:
-                          const Color(
-                        0xFFF2EDFA,
-                      ),
-                      border:
-                          OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          25,
-                        ),
-                        borderSide:
-                            BorderSide.none,
-                      ),
-                      contentPadding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(
-                  width: 4,
-                ),
-                IconButton(
-                  onPressed:
-                      _loading
-                          ? null
-                          : _toggleListening,
-                  icon: Icon(
-                    _listening
-                        ? Icons
-                            .stop_circle_rounded
-                        : Icons.mic_rounded,
-                    size: 31,
-                    color:
-                        _listening
-                            ? Colors.red
-                            : const Color(
-                                0xFF673AB7,
-                              ),
-                  ),
-                ),
-                IconButton(
-                  onPressed:
-                      _loading
-                          ? null
-                          : _sendMessage,
-                  icon: Icon(
-                    Icons.send_rounded,
-                    size: 34,
-                    color:
-                        _loading
-                            ? Colors.grey
-                            : const Color(
-                                0xFF673AB7,
-                              ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // HEADER
-  // ============================================================
-
-  Widget _buildHeader() {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding:
-            const EdgeInsets.fromLTRB(
-          16,
-          8,
-          10,
-          8,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration:
-                  BoxDecoration(
-                color:
-                    const Color(
-                  0xFFE9D8FF,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  18,
-                ),
-              ),
-              child:
-                  const Icon(
-                Icons.school_rounded,
-                size: 32,
-                color:
-                    Color(0xFF673AB7),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
-                children: [
-                  Text(
-                    'AI Personal Teacher',
-                    maxLines: 1,
-                    overflow:
-                        TextOverflow
-                            .ellipsis,
-                    style: TextStyle(
-                      fontSize: 23,
-                      fontWeight:
-                          FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    'आपका digital teacher',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color:
-                          Colors.grey,
-                      fontWeight:
-                          FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              onPressed: _newChat,
-              icon:
-                  const Icon(
-                Icons
-                    .add_comment_outlined,
-                size: 30,
-              ),
-            ),
-            PopupMenuButton<String>(
-              onSelected:
-                  (value) {
-                if (value ==
-                    'clear') {
-                  _newChat();
-                }
-              },
-              itemBuilder:
-                  (context) =>
-                      const [
-                PopupMenuItem(
-                  value: 'clear',
-                  child: Text(
-                    'नई Chat',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // LOADING
-  // ============================================================
-
-  Widget _buildLoadingBubble() {
-    return Align(
-      alignment:
-          Alignment.centerLeft,
-      child: Container(
-        margin:
-            const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
-        ),
-        padding:
-            const EdgeInsets.all(18),
-        decoration:
-            BoxDecoration(
-          color: Colors.white,
-          borderRadius:
-              BorderRadius.circular(
-            22,
-          ),
-        ),
-        child:
-            const Row(
-          mainAxisSize:
-              MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child:
-                  CircularProgressIndicator(
-                strokeWidth: 2.5,
-              ),
-            ),
-            SizedBox(width: 12),
-            Text(
-              'Teacher सोच रहा है...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight:
-                    FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // SCROLL
-  // ============================================================
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance
-        .addPostFrameCallback(
-      (_) {
-        if (!_scrollController
-            .hasClients) {
-          return;
-        }
-
-        _scrollController.animateTo(
-          _scrollController
-              .position
-              .maxScrollExtent,
-          duration:
-              const Duration(
-            milliseconds: 300,
-          ),
-          curve: Curves.easeOut,
-        );
-      },
-    );
-  }
-
-  // ============================================================
-  // SNACKBAR
-  // ============================================================
-
-  void _showMessage(String text) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(text),
-        behavior:
-            SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // ============================================================
-  // BUILD
-  // ============================================================
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildHeader(),
-          _buildStudyPanel(),
-          Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller:
-                        _scrollController,
-                    padding:
-                        const EdgeInsets
-                            .only(
-                      top: 8,
-                      bottom: 20,
-                    ),
-                    itemCount:
-                        _messages.length +
-                            (_loading
-                                ? 1
-                                : 0),
-                    itemBuilder:
-                        (context, index) {
-                      if (index ==
-                          _messages.length) {
-                        return
-                            _buildLoadingBubble();
-                      }
-
-                      return _buildMessage(
-                        _messages[index],
-                      );
-                    },
-                  ),
-          ),
-          _buildInputArea(),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // DISPOSE
-  // ============================================================
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _scrollController.dispose();
-    _speech.stop();
-    _tts.stop();
-    super.dispose();
-  }
-}
+अगर विद्यार्थी "समझाओ
