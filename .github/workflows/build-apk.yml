@@ -2,124 +2,42 @@ name: Build AI Personal Teacher APK
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: read
+  push:
+    branches:
+      - main
 
 jobs:
-  build:
+  build-apk:
     runs-on: ubuntu-latest
 
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
-      - name: Check AI Personal Teacher source
-        run: |
-          echo "Current project:"
-          pwd
-          echo "Files:"
-          ls -la
-          echo "Checking main.dart:"
-          test -f lib/main.dart
-          echo "main.dart found successfully."
-
-      - name: Configure Android project
-        run: |
-          flutter create --platforms=android .
-
-      - name: Remove default Flutter test
-        run: |
-          rm -rf test
-          echo "Default Flutter test removed."
-
-      - name: Configure Android permissions
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          manifest = Path("android/app/src/main/AndroidManifest.xml")
-
-          if not manifest.exists():
-              raise SystemExit("AndroidManifest.xml not found")
-
-          text = manifest.read_text()
-
-          permissions = [
-              "android.permission.INTERNET",
-              "android.permission.RECORD_AUDIO",
-              "android.permission.CAMERA",
-          ]
-
-          first_end = text.find(">")
-
-          if first_end == -1:
-              raise SystemExit("AndroidManifest.xml is invalid")
-
-          permission_lines = ""
-
-          for permission in permissions:
-              if permission not in text:
-                  permission_lines += (
-                      f'\n    <uses-permission '
-                      f'android:name="{permission}"/>'
-                  )
-
-          if permission_lines:
-              text = (
-                  text[:first_end + 1]
-                  + permission_lines
-                  + text[first_end + 1:]
-              )
-
-          speech_query = """
-          <queries>
-              <intent>
-                  <action android:name="android.speech.RecognitionService" />
-              </intent>
-          </queries>
-          """
-
-          if "android.speech.RecognitionService" not in text:
-              text = text.replace(
-                  "</manifest>",
-                  speech_query + "\n</manifest>"
-              )
-
-          manifest.write_text(text)
-
-          print("Android permissions configured successfully.")
-          PY
+      - name: Check Flutter
+        run: flutter --version
 
       - name: Get dependencies
-        run: |
-          flutter pub get
+        run: flutter pub get
 
       - name: Analyze Flutter project
-        run: |
-          flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos
 
       - name: Build Release APK
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "ERROR: GEMINI_API_KEY secret is missing."
-            exit 1
-          fi
-
           flutter build apk --release \
-            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
