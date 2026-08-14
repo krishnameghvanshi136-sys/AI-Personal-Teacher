@@ -31,6 +31,10 @@ jobs:
           rm -rf app/lib
           cp -r lib app/lib
 
+      - name: Remove default Flutter test
+        run: |
+          rm -rf app/test
+
       - name: Configure Android permissions
         run: |
           python3 - <<'PY'
