@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const AIPersonalTeacherApp());
 }
 
@@ -58,7 +59,6 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
     'GEMINI_API_KEY',
   );
 
-  // Gemini 2.5 Flash
   static const String modelName = 'gemini-2.5-flash';
 
   GenerativeModel? _model;
@@ -149,7 +149,7 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
   }
 
   // ============================================================
-  // GEMINI INITIALIZATION
+  // GEMINI
   // ============================================================
 
   void _initializeGemini() {
@@ -162,57 +162,26 @@ class _TeacherHomePageState extends State<TeacherHomePage> {
       apiKey: apiKey,
       systemInstruction: Content.system(
         '''
-आप "AI Personal Teacher" नाम के एक डिजिटल शिक्षक हैं।
+आप AI Personal Teacher हैं।
 
-आपका मुख्य काम बच्चों को उनकी कक्षा, विषय और चुने हुए topic के अनुसार पढ़ाना है।
+आपका काम विद्यार्थी को एक अच्छे स्कूल शिक्षक की तरह पढ़ाना है।
 
-==============================
-STUDENT LEVEL
-==============================
+महत्वपूर्ण नियम:
 
-हर जवाब विद्यार्थी की चुनी हुई कक्षा के स्तर के अनुसार होना चाहिए।
+1. विद्यार्थी की चुनी हुई कक्षा को हमेशा ध्यान में रखें।
+2. विद्यार्थी के चुने हुए विषय को ध्यान में रखें।
+3. चुने हुए अध्याय या Topic को ध्यान में रखें।
+4. विद्यार्थी जिस भाषा में सवाल पूछे, उसी भाषा में जवाब दें।
+5. Hindi सवाल का जवाब आसान Hindi में दें।
+6. Hinglish सवाल का जवाब आसान Hindi या Hinglish में दें।
+7. English सवाल का जवाब English में दें।
+8. छोटे बच्चों को बहुत आसान भाषा में समझाएँ।
+9. बड़ी कक्षा के विद्यार्थी को जरूरत के अनुसार थोड़ा विस्तृत उत्तर दें।
+10. बिना जरूरत बहुत लंबा उत्तर न दें।
 
-कक्षा छोटी है तो:
-- बहुत आसान भाषा इस्तेमाल करें।
-- छोटे वाक्यों का उपयोग करें।
-- आसान उदाहरण दें।
-- कठिन शब्दों का अर्थ समझाएँ।
+गणित:
 
-कक्षा बड़ी है तो:
-- विषय के अनुसार थोड़ा विस्तृत उत्तर दे सकते हैं।
-- लेकिन अनावश्यक कठिन भाषा का उपयोग न करें।
-
-==============================
-LANGUAGE RULE
-==============================
-
-विद्यार्थी जिस भाषा में सवाल पूछता है उसी भाषा में उत्तर दें।
-
-अगर सवाल Hindi में है:
-Hindi में जवाब दें।
-
-अगर सवाल Hinglish में है:
-आसान Hindi/Hinglish में जवाब दें।
-
-अगर सवाल English में है:
-English में जवाब दें।
-
-==============================
-ANSWER RULE
-==============================
-
-सबसे पहले विद्यार्थी के सवाल का सीधा उत्तर दें।
-
-अगर सवाल बहुत छोटा है तो छोटा और सीधा उत्तर दें।
-
-अगर विद्यार्थी "समझाओ", "कैसे", "क्यों", "पूरा समझाओ" आदि पूछता है:
-तब step-by-step समझाएँ।
-
-गणित के सवाल में:
-1. दिए गए तथ्य बताएं।
-2. Formula या calculation बताएं।
-3. Calculation करें।
-4. अंतिम उत्तर साफ लिखें।
+अगर गणित का सवाल है तो calculation साफ तरीके से दिखाएँ।
 
 उदाहरण:
 
@@ -220,95 +189,55 @@ ANSWER RULE
 समय = 1 घंटा
 
 चाल = दूरी ÷ समय
+
 चाल = 100 ÷ 1
+
 चाल = 100 किलोमीटर प्रति घंटा
 
 उत्तर: 100 किलोमीटर प्रति घंटा
 
-==============================
-STUDY MODE
-==============================
+Study Mode:
 
-जब Study Mode ON हो:
+अगर Study Mode ON है तो विद्यार्थी को शिक्षक की तरह समझाएँ।
 
-विद्यार्थी को शिक्षक की तरह पढ़ाएँ।
+अगर विद्यार्थी किसी concept को समझाने के लिए कहता है:
 
-अगर विद्यार्थी किसी concept के बारे में पूछता है:
 1. आसान भाषा में concept समझाएँ।
 2. एक आसान उदाहरण दें।
-3. जरूरत हो तो छोटा अभ्यास प्रश्न दें।
+3. जरूरत होने पर छोटा अभ्यास दें।
 
-लेकिन हर जवाब के अंत में जबरदस्ती नया सवाल न पूछें।
+लेकिन हर उत्तर के अंत में नया सवाल जबरदस्ती न पूछें।
 
-अगर विद्यार्थी सिर्फ factual question पूछता है,
-तो सिर्फ उसका सही उत्तर दें।
-
-==============================
-CLASS + SUBJECT
-==============================
-
-हमेशा इन तीन चीजों को ध्यान में रखें:
-
-कक्षा
-विषय
-अध्याय / Topic
+अगर विद्यार्थी सिर्फ factual question पूछता है तो केवल सही और साफ उत्तर दें।
 
 उदाहरण:
 
-कक्षा: कक्षा 5
-विषय: गणित
-Topic: भिन्न
-
-तो उत्तर कक्षा 5 के स्तर का होना चाहिए।
-
-==============================
-GENERAL QUESTIONS
-==============================
-
-अगर विद्यार्थी Study Mode में है लेकिन सामान्य जानकारी का सवाल पूछता है,
-तो सवाल का सही और सरल उत्तर दें।
-
-उदाहरण:
-
-विद्यार्थी:
+सवाल:
 भारत की राजधानी क्या है?
 
 उत्तर:
 भारत की राजधानी नई दिल्ली है।
 
-बस जरूरत से ज्यादा explanation न दें।
+Image:
 
-==============================
-IMAGE QUESTIONS
-==============================
+अगर विद्यार्थी image भेजता है तो image को ध्यान से देखें।
 
-अगर विद्यार्थी image भेजता है:
+अगर image में homework या प्रश्न है तो उसे पढ़कर हल करें।
 
-Image को ध्यान से देखकर जवाब दें।
+अगर image साफ नहीं दिखाई देती है तो साफ बताएं कि image स्पष्ट नहीं है।
 
-अगर image में homework या question है:
-उसे पढ़कर आसान तरीके से हल करें।
+गलत उत्तर:
 
-अगर image साफ नहीं है:
-विद्यार्थी को बताएं कि image साफ नहीं दिखाई दे रही है।
-
-==============================
-IMPORTANT SAFETY
-==============================
-
-अगर विद्यार्थी गलत उत्तर देता है:
-उसे डांटें नहीं।
+अगर विद्यार्थी गलत उत्तर देता है तो उसे डांटें नहीं।
 
 कहें:
-"कोई बात नहीं, इसे एक बार सही तरीके से समझते हैं।"
+कोई बात नहीं, इसे सही तरीके से समझते हैं।
 
-==============================
-VERY IMPORTANT FORMATTING RULE
-==============================
+बहुत महत्वपूर्ण:
 
 उत्तर में Markdown formatting का उपयोग न करें।
 
-इनका उपयोग बिल्कुल न करें:
+इनका उपयोग न करें:
 
 **
 ***
@@ -316,18 +245,25 @@ VERY IMPORTANT FORMATTING RULE
 ##
 $
 $$
+
+LaTeX commands का उपयोग न करें।
+
+इनका उपयोग न करें:
+
 \\div
 \\frac
+\\times
+\\cdot
 
-LaTeX mathematics न लिखें।
-
-इसके बजाय सामान्य text और symbols इस्तेमाल करें:
+गणित में सामान्य symbols का उपयोग करें:
 
 ÷
 ×
 =
 +
 −
+≥
+≤
 
 उदाहरण:
 
@@ -349,44 +285,32 @@ $2500 \\div 25$
 सही:
 उत्तर
 
-==============================
-NO META TALK
-==============================
+उत्तर में ये बातें न लिखें:
 
-कभी भी यह न लिखें:
+उत्तर आएगा
+अब आपकी बारी
+अब आपकी बारी है
+चलो challenge करते हैं
+क्या आप इसका जवाब दे सकते हैं?
 
-"उत्तर आएगा"
-"अब आपकी बारी"
-"क्या आप इसका उत्तर बता सकते हैं?"
-"चलो एक challenge करते हैं"
+जब तक विद्यार्थी खुद अभ्यास प्रश्न न मांगे, बिना जरूरत नया सवाल न बनाएं।
 
-जब तक विद्यार्थी खुद अभ्यास प्रश्न न मांगे,
-बिना जरूरत नया सवाल न बनाएं।
+बिना जरूरत motivational speech न दें।
 
 विद्यार्थी ने जो पूछा है उसी का उत्तर दें।
 
-==============================
-NO AI META
-==============================
-
-अपने बारे में यह न कहें कि:
-"मैं AI हूँ इसलिए..."
+अपने बारे में अनावश्यक AI या model की जानकारी न दें।
 
 सीधे शिक्षक की तरह मदद करें।
-
-==============================
-FINAL QUALITY RULE
-==============================
 
 हर उत्तर:
 
 सही
 स्पष्ट
+सरल
 कक्षा के अनुसार
 विषय के अनुसार
-सरल
 और विद्यार्थी के लिए उपयोगी होना चाहिए।
-
 ''',
       ),
     );
@@ -395,14 +319,16 @@ FINAL QUALITY RULE
   }
 
   // ============================================================
-  // SPEECH
+  // SPEECH INITIALIZATION
   // ============================================================
 
   Future<void> _initializeSpeech() async {
     try {
       final available = await _speech.initialize(
         onStatus: (status) {
-          if (!mounted) return;
+          if (!mounted) {
+            return;
+          }
 
           if (status == 'notListening') {
             setState(() {
@@ -411,7 +337,9 @@ FINAL QUALITY RULE
           }
         },
         onError: (error) {
-          if (!mounted) return;
+          if (!mounted) {
+            return;
+          }
 
           setState(() {
             _listening = false;
@@ -419,13 +347,17 @@ FINAL QUALITY RULE
         },
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _speechAvailable = available;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _speechAvailable = false;
@@ -434,7 +366,7 @@ FINAL QUALITY RULE
   }
 
   // ============================================================
-  // TTS
+  // TTS INITIALIZATION
   // ============================================================
 
   Future<void> _initializeTts() async {
@@ -454,69 +386,189 @@ FINAL QUALITY RULE
     final topic = _selectedTopic.trim();
 
     return '''
-वर्तमान विद्यार्थी:
+विद्यार्थी की वर्तमान जानकारी:
 
 कक्षा: $_selectedClass
 विषय: $_selectedSubject
-अध्याय/Topic: ${topic.isEmpty ? 'कोई विशेष topic नहीं चुना गया' : topic}
+अध्याय/Topic: ${topic.isEmpty ? 'कोई Topic नहीं चुना गया' : topic}
 Study Mode: ${_studyMode ? 'ON' : 'OFF'}
-
-इस विद्यार्थी के जवाब में ऊपर दी गई जानकारी को ध्यान में रखें।
 ''';
   }
 
   // ============================================================
-  // CLEAN GEMINI RESPONSE
+  // CLEAN ANSWER
   // ============================================================
 
   String _cleanAnswer(String text) {
     String answer = text.trim();
 
-    // Markdown हटाएँ
-    answer = answer.replaceAll('###', '');
-    answer = answer.replaceAll('##', '');
-    answer = answer.replaceAll('#', '');
+    // ------------------------------------------------------------
+    // Markdown headings
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAll(
+      RegExp(r'(?m)^\s*#{1,6}\s*'),
+      '',
+    );
+
+    // ------------------------------------------------------------
+    // Bold / italic
+    // ------------------------------------------------------------
 
     answer = answer.replaceAll('***', '');
     answer = answer.replaceAll('**', '');
     answer = answer.replaceAll('__', '');
+    answer = answer.replaceAll('*', '');
 
-    // Dollar math markers
+    // ------------------------------------------------------------
+    // Dollar signs
+    // ------------------------------------------------------------
+
     answer = answer.replaceAll('$$', '');
+    answer = answer.replaceAll(r'\$', '');
+
+    // अगर कोई अकेला $ बचा है
     answer = answer.replaceAll('\$', '');
 
-    // Common LaTeX
-    answer = answer.replaceAll(r'\div', '÷');
-    answer = answer.replaceAll(r'\times', '×');
-    answer = answer.replaceAll(r'\cdot', '×');
-    answer = answer.replaceAll(r'\pm', '±');
-    answer = answer.replaceAll(r'\geq', '≥');
-    answer = answer.replaceAll(r'\leq', '≤');
+    // ------------------------------------------------------------
+    // LaTeX commands
+    // ------------------------------------------------------------
 
-    // Common escaped slash
+    answer = answer.replaceAll(
+      RegExp(r'\\div\b'),
+      '÷',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\times\b'),
+      '×',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\cdot\b'),
+      '×',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\pm\b'),
+      '±',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\leq\b'),
+      '≤',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\geq\b'),
+      '≥',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\neq\b'),
+      '≠',
+    );
+
+    answer = answer.replaceAll(
+      RegExp(r'\\sqrt\b'),
+      '√',
+    );
+
+    // ------------------------------------------------------------
+    // LaTeX fraction
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAllMapped(
+      RegExp(
+        r'\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}',
+      ),
+      (match) {
+        final a = match.group(1) ?? '';
+        final b = match.group(2) ?? '';
+
+        if (a.isEmpty || b.isEmpty) {
+          return '';
+        }
+
+        return '$a ÷ $b';
+      },
+    );
+
+    // ------------------------------------------------------------
+    // Math delimiters
+    // ------------------------------------------------------------
+
     answer = answer.replaceAll(r'\(', '');
     answer = answer.replaceAll(r'\)', '');
     answer = answer.replaceAll(r'\[', '');
     answer = answer.replaceAll(r'\]', '');
 
-    // कुछ unwanted meta phrases
-    answer = answer.replaceAll(
+    // ------------------------------------------------------------
+    // Code block markers
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAll('```', '');
+
+    // ------------------------------------------------------------
+    // Unwanted meta phrases
+    // ------------------------------------------------------------
+
+    final unwantedPhrases = <String>[
       'उत्तर आएगा:',
-      '',
-    );
-
-    answer = answer.replaceAll(
+      'उत्तर आएगा',
       'अब आपकी बारी:',
+      'अब आपकी बारी',
+      'अब आपकी बारी है:',
+      'अब आपकी बारी है',
+      'चलो एक challenge करते हैं:',
+      'चलो एक challenge करते हैं',
+      'चलो challenge करते हैं:',
+      'चलो challenge करते हैं',
+      'क्या आप इसका उत्तर बता सकते हैं?',
+      'क्या आप इसका उत्तर बता सकते हैं',
+      'क्या आप इसका जवाब बता सकते हैं?',
+      'क्या आप इसका जवाब बता सकते हैं',
+    ];
+
+    for (final phrase in unwantedPhrases) {
+      answer = answer.replaceAll(phrase, '');
+    }
+
+    // ------------------------------------------------------------
+    // कुछ सामान्य AI meta text हटाएँ
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAll(
+      RegExp(
+        r'(?i)^\s*here is the answer\s*:?\s*',
+      ),
       '',
     );
 
     answer = answer.replaceAll(
-      'अब आपकी बारी',
+      RegExp(
+        r'(?i)^\s*answer\s*:?\s*',
+      ),
       '',
     );
 
+    // ------------------------------------------------------------
     // Extra blank lines
-    answer = answer.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAll(
+      RegExp(r'\n{3,}'),
+      '\n\n',
+    );
+
+    // ------------------------------------------------------------
+    // Extra spaces
+    // ------------------------------------------------------------
+
+    answer = answer.replaceAll(
+      RegExp(r'[ \t]{3,}'),
+      ' ',
+    );
 
     return answer.trim();
   }
@@ -547,7 +599,7 @@ Study Mode: ${_studyMode ? 'ON' : 'OFF'}
         ? 'इस image में दिए गए सवाल को देखकर आसान भाषा में हल करें।'
         : question;
 
-    final imageForMessage = _selectedImage;
+    final Uint8List? imageForMessage = _selectedImage;
 
     setState(() {
       _messages.add(
@@ -573,17 +625,49 @@ ${_teacherContext()}
 
 $finalQuestion
 
-अब सिर्फ विद्यार्थी के सवाल का उपयोगी उत्तर दें।
+अब विद्यार्थी के सवाल का सीधा और उपयोगी उत्तर दें।
 
-उत्तर:
-- सरल रखें।
-- चुनी हुई कक्षा के स्तर का रखें।
-- सीधे सवाल का जवाब दें।
-- जरूरत होने पर step-by-step समझाएँ।
-- Markdown या LaTeX का उपयोग न करें।
-- $ या ** या ### का उपयोग न करें।
-- बिना जरूरत नया सवाल न पूछें।
-- बिना जरूरत motivational speech न दें।
+बहुत महत्वपूर्ण:
+
+सिर्फ सवाल का उत्तर दें।
+
+उत्तर को सरल रखें।
+
+कक्षा के स्तर के अनुसार उत्तर दें।
+
+जरूरत होने पर step-by-step समझाएँ।
+
+Markdown का उपयोग न करें।
+
+इनका उपयोग बिल्कुल न करें:
+
+**
+***
+###
+##
+$
+$$
+
+LaTeX का उपयोग न करें।
+
+\\div
+\\frac
+\\times
+\\cdot
+
+की जगह सामान्य symbols इस्तेमाल करें:
+
+÷
+×
+=
++
+−
+
+बिना जरूरत नया सवाल न पूछें।
+
+बिना जरूरत "अब आपकी बारी" न लिखें।
+
+बिना जरूरत motivational speech न दें।
 ''';
 
       GenerateContentResponse response;
@@ -604,11 +688,14 @@ $finalQuestion
         );
       }
 
-      final rawAnswer = response.text?.trim();
+      final rawAnswer = response.text;
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      if (rawAnswer == null || rawAnswer.isEmpty) {
+      if (rawAnswer == null ||
+          rawAnswer.trim().isEmpty) {
         setState(() {
           _messages.add(
             ChatMessage(
@@ -619,19 +706,24 @@ $finalQuestion
           );
         });
       } else {
-        final cleanAnswer = _cleanAnswer(rawAnswer);
+        final cleanAnswer =
+            _cleanAnswer(rawAnswer);
 
         setState(() {
           _messages.add(
             ChatMessage(
-              text: cleanAnswer,
+              text: cleanAnswer.isEmpty
+                  ? 'अभी जवाब नहीं मिल पाया। कृपया दोबारा कोशिश करें।'
+                  : cleanAnswer,
               isUser: false,
             ),
           );
         });
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _messages.add(
@@ -641,15 +733,17 @@ $finalQuestion
           ),
         );
       });
-    } finally {
-      if (!mounted) return;
-
-      setState(() {
-        _loading = false;
-      });
-
-      _scrollToBottom();
     }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _loading = false;
+    });
+
+    _scrollToBottom();
   }
 
   // ============================================================
@@ -659,50 +753,52 @@ $finalQuestion
   String _friendlyError(Object error) {
     final message = error.toString();
 
-    if (message.contains('InvalidApiKey') ||
-        message.contains('API key') ||
-        message.contains('401')) {
+    final lower = message.toLowerCase();
+
+    if (lower.contains('invalidapikey') ||
+        lower.contains('api key') ||
+        lower.contains('401')) {
       return '''
-❌ Gemini API key में समस्या है।
+Gemini API key में समस्या है।
 
 API key check करें।
 ''';
     }
 
-    if (message.contains('404') ||
-        message.contains('NOT_FOUND') ||
-        message.contains('not found')) {
+    if (lower.contains('404') ||
+        lower.contains('not_found') ||
+        lower.contains('not found')) {
       return '''
-❌ Gemini model उपलब्ध नहीं है।
+Gemini model उपलब्ध नहीं है।
 
 Model:
 gemini-2.5-flash
 
-Google AI API key और model access check करें।
+API key और Gemini model access check करें।
 ''';
     }
 
-    if (message.contains('429') ||
-        message.contains('RESOURCE_EXHAUSTED')) {
+    if (lower.contains('429') ||
+        lower.contains('resource_exhausted')) {
       return '''
-⚠️ Gemini API की request limit पूरी हो गई है।
+Gemini API की request limit पूरी हो गई है।
 
 कुछ समय बाद दोबारा कोशिश करें।
 ''';
     }
 
-    if (message.contains('SocketException') ||
-        message.contains('Failed host lookup') ||
-        message.contains('Network')) {
+    if (lower.contains('socketexception') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network')) {
       return '''
-❌ Internet connection की समस्या है।
+Internet connection की समस्या है।
 
 Internet ON करके दोबारा कोशिश करें।
 ''';
     }
 
     return '''
-❌ जवाब नहीं मिल पाया।
+जवाब नहीं मिल पाया।
 
 Internet connection और Gemini API key check करें।
 ''';
@@ -713,7 +809,9 @@ Internet connection और Gemini API key check करें।
   // ============================================================
 
   Future<void> _toggleListening() async {
-    if (_loading) return;
+    if (_loading) {
+      return;
+    }
 
     if (!_speechAvailable) {
       _showMessage(
@@ -725,7 +823,9 @@ Internet connection और Gemini API key check करें।
     if (_listening) {
       await _speech.stop();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _listening = false;
@@ -740,9 +840,11 @@ Internet connection और Gemini API key check करें।
       String? localeId;
 
       for (final locale in locales) {
-        final id = locale.localeId.toLowerCase();
+        final id =
+            locale.localeId.toLowerCase();
 
-        if (id == 'hi_in' || id == 'hi-in') {
+        if (id == 'hi_in' ||
+            id == 'hi-in') {
           localeId = locale.localeId;
           break;
         }
@@ -750,13 +852,19 @@ Internet connection और Gemini API key check करें।
 
       localeId ??= 'en_IN';
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _listening = true;
       });
 
       await _speech.listen(
         onResult: (result) {
-          if (!mounted) return;
+          if (!mounted) {
+            return;
+          }
 
           setState(() {
             _textController.text =
@@ -777,16 +885,20 @@ Internet connection और Gemini API key check करें।
             });
           }
         },
-        listenOptions: stt.SpeechListenOptions(
+        listenOptions:
+            stt.SpeechListenOptions(
           partialResults: true,
           cancelOnError: true,
           localeId: localeId,
-          listenMode: stt.ListenMode.dictation,
+          listenMode:
+              stt.ListenMode.dictation,
           autoPunctuation: true,
         ),
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _listening = false;
@@ -803,20 +915,28 @@ Internet connection और Gemini API key check करें।
   // ============================================================
 
   Future<void> _pickImage() async {
-    if (_loading) return;
+    if (_loading) {
+      return;
+    }
 
     try {
-      final image = await _imagePicker.pickImage(
+      final image =
+          await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
         maxWidth: 1600,
       );
 
-      if (image == null) return;
+      if (image == null) {
+        return;
+      }
 
-      final bytes = await image.readAsBytes();
+      final bytes =
+          await image.readAsBytes();
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _selectedImage = bytes;
@@ -829,7 +949,7 @@ Internet connection और Gemini API key check करें।
   }
 
   // ============================================================
-  // TEXT TO SPEECH
+  // TTS
   // ============================================================
 
   Future<void> _speak(String text) async {
@@ -837,7 +957,8 @@ Internet connection और Gemini API key check करें।
       await _tts.stop();
 
       final isHindi =
-          RegExp(r'[\u0900-\u097F]').hasMatch(text);
+          RegExp(r'[\u0900-\u097F]')
+              .hasMatch(text);
 
       if (isHindi) {
         await _tts.setLanguage('hi-IN');
@@ -860,8 +981,9 @@ Internet connection और Gemini API key check करें।
   void _newChat() {
     setState(() {
       _messages.clear();
-      _selectedTopic = '';
       _selectedImage = null;
+      _selectedTopic = '';
+      _textController.clear();
     });
 
     if (_model != null) {
@@ -870,12 +992,16 @@ Internet connection और Gemini API key check करें।
   }
 
   // ============================================================
-  // RESET CHAT WHEN CLASS/SUBJECT CHANGES
+  // RESTART CHAT
   // ============================================================
 
-  void _restartChatOnly() {
+  void _restartChat() {
     if (_model != null) {
       _chat = _model!.startChat();
+    }
+
+    if (!mounted) {
+      return;
     }
 
     if (_messages.isNotEmpty) {
@@ -891,20 +1017,26 @@ Internet connection और Gemini API key check करें।
 
   Future<void> _editTopic() async {
     final controller =
-        TextEditingController(text: _selectedTopic);
+        TextEditingController(
+      text: _selectedTopic,
+    );
 
-    final result = await showDialog<String>(
+    final result =
+        await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('अध्याय / Topic'),
+          title:
+              const Text('अध्याय / Topic'),
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(
+            decoration:
+                const InputDecoration(
               hintText:
                   'जैसे: भिन्न, प्रकाश, grammar...',
-              border: OutlineInputBorder(),
+              border:
+                  OutlineInputBorder(),
             ),
           ),
           actions: [
@@ -912,7 +1044,8 @@ Internet connection और Gemini API key check करें।
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('रद्द'),
+              child:
+                  const Text('रद्द'),
             ),
             FilledButton(
               onPressed: () {
@@ -921,7 +1054,8 @@ Internet connection और Gemini API key check करें।
                   controller.text.trim(),
                 );
               },
-              child: const Text('सेट करें'),
+              child:
+                  const Text('सेट करें'),
             ),
           ],
         );
@@ -930,13 +1064,15 @@ Internet connection और Gemini API key check करें।
 
     controller.dispose();
 
-    if (result == null) return;
+    if (result == null) {
+      return;
+    }
 
     setState(() {
       _selectedTopic = result;
     });
 
-    _restartChatOnly();
+    _restartChat();
   }
 
   // ============================================================
@@ -950,25 +1086,32 @@ Internet connection और Gemini API key check करें।
     required ValueChanged<String?> onChanged,
   }) {
     return Expanded(
-      child: DropdownButtonFormField<String>(
-        initialValue: value,
+      child:
+          DropdownButtonFormField<String>(
+        value: value,
         isExpanded: true,
-        decoration: InputDecoration(
+        decoration:
+            InputDecoration(
           labelText: label,
           filled: true,
           fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide.none,
+          border:
+              OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(20),
+            borderSide:
+                BorderSide.none,
           ),
         ),
         items: items
             .map(
-              (item) => DropdownMenuItem<String>(
+              (item) =>
+                  DropdownMenuItem<String>(
                 value: item,
                 child: Text(
                   item,
-                  overflow: TextOverflow.ellipsis,
+                  overflow:
+                      TextOverflow.ellipsis,
                 ),
               ),
             )
@@ -984,22 +1127,28 @@ Internet connection और Gemini API key check करें।
 
   Widget _buildStudyPanel() {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.fromLTRB(
+      duration:
+          const Duration(milliseconds: 250),
+      margin:
+          const EdgeInsets.fromLTRB(
         16,
         8,
         16,
         8,
       ),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
+      padding:
+          const EdgeInsets.all(16),
+      decoration:
+          BoxDecoration(
+        gradient:
+            const LinearGradient(
           colors: [
             Color(0xFFE9D8FF),
             Color(0xFFF2E8FF),
           ],
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius:
+            BorderRadius.circular(28),
       ),
       child: Column(
         children: [
@@ -1008,24 +1157,32 @@ Internet connection और Gemini API key check करें।
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
+                decoration:
+                    BoxDecoration(
                   color: Colors.white,
                   borderRadius:
-                      BorderRadius.circular(18),
+                      BorderRadius.circular(
+                    18,
+                  ),
                 ),
                 child: const Icon(
-                  Icons.menu_book_rounded,
-                  color: Color(0xFF673AB7),
+                  Icons
+                      .menu_book_rounded,
+                  color:
+                      Color(0xFF673AB7),
                   size: 30,
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(
+                width: 14,
+              ),
               const Expanded(
                 child: Text(
                   'Study Mode',
                   style: TextStyle(
                     fontSize: 25,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                        FontWeight.w800,
                   ),
                 ),
               ),
@@ -1033,87 +1190,127 @@ Internet connection और Gemini API key check करें।
                 value: _studyMode,
                 onChanged: (value) {
                   setState(() {
-                    _studyMode = value;
+                    _studyMode =
+                        value;
                   });
 
-                  _restartChatOnly();
+                  _restartChat();
                 },
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(
+            height: 14,
+          ),
           Row(
             children: [
               _dropdownBox(
                 label: 'कक्षा',
-                value: _selectedClass,
+                value:
+                    _selectedClass,
                 items: _classes,
-                onChanged: (value) {
-                  if (value == null) return;
+                onChanged:
+                    (value) {
+                  if (value ==
+                      null) {
+                    return;
+                  }
 
                   setState(() {
-                    _selectedClass = value;
+                    _selectedClass =
+                        value;
                   });
 
-                  _restartChatOnly();
+                  _restartChat();
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
               _dropdownBox(
                 label: 'विषय',
-                value: _selectedSubject,
+                value:
+                    _selectedSubject,
                 items: _subjects,
-                onChanged: (value) {
-                  if (value == null) return;
+                onChanged:
+                    (value) {
+                  if (value ==
+                      null) {
+                    return;
+                  }
 
                   setState(() {
-                    _selectedSubject = value;
+                    _selectedSubject =
+                        value;
                   });
 
-                  _restartChatOnly();
+                  _restartChat();
                 },
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(
+            height: 12,
+          ),
           InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
             onTap: _editTopic,
             child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
+              width:
+                  double.infinity,
+              padding:
+                  const EdgeInsets
+                      .symmetric(
                 horizontal: 18,
                 vertical: 17,
               ),
-              decoration: BoxDecoration(
+              decoration:
+                  BoxDecoration(
                 color: Colors.white,
                 borderRadius:
-                    BorderRadius.circular(20),
+                    BorderRadius.circular(
+                  20,
+                ),
               ),
               child: Row(
                 children: [
                   const Icon(
-                    Icons.menu_book_outlined,
-                    color: Color(0xFF673AB7),
+                    Icons
+                        .menu_book_outlined,
+                    color:
+                        Color(0xFF673AB7),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(
+                    width: 12,
+                  ),
                   Expanded(
                     child: Text(
-                      _selectedTopic.isEmpty
+                      _selectedTopic
+                              .isEmpty
                           ? 'अध्याय / Topic (वैकल्पिक)'
                           : _selectedTopic,
-                      style: TextStyle(
+                      style:
+                          TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                        color:
-                            _selectedTopic.isEmpty
-                                ? Colors.grey.shade700
-                                : Colors.black87,
+                        fontWeight:
+                            FontWeight
+                                .w600,
+                        color: _selectedTopic
+                                .isEmpty
+                            ? Colors
+                                .grey
+                                .shade700
+                            : Colors
+                                .black87,
                       ),
                     ),
                   ),
                   const Icon(
-                    Icons.edit_outlined,
+                    Icons
+                        .edit_outlined,
                   ),
                 ],
               ),
@@ -1128,36 +1325,60 @@ Internet connection और Gemini API key check करें।
   // MESSAGE
   // ============================================================
 
-  Widget _buildMessage(ChatMessage message) {
-    final isUser = message.isUser;
+  Widget _buildMessage(
+    ChatMessage message,
+  ) {
+    final isUser =
+        message.isUser;
 
     return Align(
       alignment: isUser
           ? Alignment.centerRight
           : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(
+        constraints:
+            BoxConstraints(
           maxWidth:
-              MediaQuery.of(context).size.width * 0.88,
+              MediaQuery.of(context)
+                      .size
+                      .width *
+                  0.88,
         ),
-        margin: const EdgeInsets.symmetric(
+        margin:
+            const EdgeInsets
+                .symmetric(
           horizontal: 16,
           vertical: 7,
         ),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
+        padding:
+            const EdgeInsets.all(
+          16,
+        ),
+        decoration:
+            BoxDecoration(
           color: isUser
-              ? const Color(0xFFE3CCFF)
+              ? const Color(
+                  0xFFE3CCFF,
+                )
               : Colors.white,
-          borderRadius: BorderRadius.only(
+          borderRadius:
+              BorderRadius.only(
             topLeft:
-                const Radius.circular(22),
+                const Radius
+                    .circular(
+              22,
+            ),
             topRight:
-                const Radius.circular(22),
-            bottomLeft: Radius.circular(
+                const Radius
+                    .circular(
+              22,
+            ),
+            bottomLeft:
+                Radius.circular(
               isUser ? 22 : 5,
             ),
-            bottomRight: Radius.circular(
+            bottomRight:
+                Radius.circular(
               isUser ? 5 : 22,
             ),
           ),
@@ -1165,8 +1386,13 @@ Internet connection और Gemini API key check करें।
             BoxShadow(
               blurRadius: 12,
               offset:
-                  const Offset(0, 4),
-              color: Colors.black.withValues(
+                  const Offset(
+                0,
+                4,
+              ),
+              color:
+                  Colors.black
+                      .withValues(
                 alpha: 0.06,
               ),
             ),
@@ -1174,68 +1400,106 @@ Internet connection और Gemini API key check करें।
         ),
         child: Column(
           crossAxisAlignment:
-              CrossAxisAlignment.start,
+              CrossAxisAlignment
+                  .start,
           children: [
             Row(
               children: [
                 CircleAvatar(
                   radius: 19,
-                  backgroundColor: isUser
-                      ? const Color(0xFF673AB7)
-                      : const Color(0xFFE9D8FF),
+                  backgroundColor:
+                      isUser
+                          ? const Color(
+                              0xFF673AB7,
+                            )
+                          : const Color(
+                              0xFFE9D8FF,
+                            ),
                   child: Icon(
                     isUser
                         ? Icons.person
-                        : Icons.school_rounded,
+                        : Icons
+                            .school_rounded,
                     color: isUser
                         ? Colors.white
-                        : const Color(0xFF673AB7),
+                        : const Color(
+                            0xFF673AB7,
+                          ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 10,
+                ),
                 Text(
-                  isUser ? 'आप' : 'Teacher',
-                  style: const TextStyle(
+                  isUser
+                      ? 'आप'
+                      : 'Teacher',
+                  style:
+                      const TextStyle(
                     fontWeight:
-                        FontWeight.w800,
+                        FontWeight
+                            .w800,
                     fontSize: 17,
                   ),
                 ),
               ],
             ),
-            if (message.imageBytes != null) ...[
-              const SizedBox(height: 12),
+            if (message.imageBytes !=
+                null) ...[
+              const SizedBox(
+                height: 12,
+              ),
               ClipRRect(
                 borderRadius:
-                    BorderRadius.circular(16),
-                child: Image.memory(
-                  message.imageBytes!,
-                  width: double.infinity,
+                    BorderRadius
+                        .circular(
+                  16,
+                ),
+                child:
+                    Image.memory(
+                  message
+                      .imageBytes!,
+                  width:
+                      double.infinity,
                   fit: BoxFit.cover,
                 ),
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
             SelectableText(
               message.text,
-              style: const TextStyle(
+              style:
+                  const TextStyle(
                 fontSize: 18,
                 height: 1.5,
-                fontWeight: FontWeight.w500,
+                fontWeight:
+                    FontWeight.w500,
               ),
             ),
             if (!isUser) ...[
-              const SizedBox(height: 8),
+              const SizedBox(
+                height: 8,
+              ),
               Align(
                 alignment:
-                    Alignment.centerRight,
-                child: IconButton(
-                  onPressed: () =>
-                      _speak(message.text),
-                  icon: const Icon(
-                    Icons.volume_up_rounded,
+                    Alignment
+                        .centerRight,
+                child:
+                    IconButton(
+                  onPressed:
+                      () => _speak(
+                    message.text,
+                  ),
+                  icon:
+                      const Icon(
+                    Icons
+                        .volume_up_rounded,
                     color:
-                        Color(0xFF673AB7),
+                        Color(
+                      0xFF673AB7,
+                    ),
                   ),
                 ),
               ),
@@ -1253,47 +1517,69 @@ Internet connection और Gemini API key check करें।
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(30),
+        padding:
+            const EdgeInsets.all(
+          30,
+        ),
         child: Column(
           mainAxisAlignment:
-              MainAxisAlignment.center,
+              MainAxisAlignment
+                  .center,
           children: [
             Container(
               width: 90,
               height: 90,
-              decoration: BoxDecoration(
+              decoration:
+                  BoxDecoration(
                 color:
-                    const Color(0xFFE9D8FF),
+                    const Color(
+                  0xFFE9D8FF,
+                ),
                 borderRadius:
-                    BorderRadius.circular(28),
+                    BorderRadius
+                        .circular(
+                  28,
+                ),
               ),
-              child: const Icon(
-                Icons.school_rounded,
+              child:
+                  const Icon(
+                Icons
+                    .school_rounded,
                 size: 52,
                 color:
-                    Color(0xFF673AB7),
+                    Color(
+                  0xFF673AB7,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(
+              height: 20,
+            ),
             const Text(
               'नमस्ते! 👋',
-              style: TextStyle(
+              style:
+                  TextStyle(
                 fontSize: 28,
                 fontWeight:
-                    FontWeight.w800,
+                    FontWeight
+                        .w800,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(
+              height: 8,
+            ),
             Text(
               'मैं आपका digital teacher हूँ।\n'
               'कोई भी सवाल पूछिए।',
               textAlign:
                   TextAlign.center,
-              style: TextStyle(
+              style:
+                  TextStyle(
                 fontSize: 17,
                 height: 1.5,
-                color:
-                    Colors.grey.shade700,
+                color: Colors
+                    .grey
+                    .shade700,
               ),
             ),
           ],
@@ -1303,27 +1589,35 @@ Internet connection और Gemini API key check करें।
   }
 
   // ============================================================
-  // INPUT
+  // INPUT AREA
   // ============================================================
 
   Widget _buildInputArea() {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(
+        padding:
+            const EdgeInsets
+                .fromLTRB(
           12,
           8,
           12,
           10,
         ),
-        decoration: BoxDecoration(
+        decoration:
+            BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               blurRadius: 14,
               offset:
-                  const Offset(0, -4),
-              color: Colors.black.withValues(
+                  const Offset(
+                0,
+                -4,
+              ),
+              color:
+                  Colors.black
+                      .withValues(
                 alpha: 0.06,
               ),
             ),
@@ -1331,10 +1625,12 @@ Internet connection और Gemini API key check करें।
         ),
         child: Column(
           children: [
-            if (_selectedImage != null)
+            if (_selectedImage !=
+                null)
               Container(
                 margin:
-                    const EdgeInsets.only(
+                    const EdgeInsets
+                        .only(
                   bottom: 8,
                 ),
                 height: 80,
@@ -1342,30 +1638,39 @@ Internet connection और Gemini API key check करें।
                   children: [
                     ClipRRect(
                       borderRadius:
-                          BorderRadius.circular(
+                          BorderRadius
+                              .circular(
                         14,
                       ),
-                      child: Image.memory(
+                      child:
+                          Image.memory(
                         _selectedImage!,
                         width: 80,
                         height: 80,
-                        fit: BoxFit.cover,
+                        fit:
+                            BoxFit.cover,
                       ),
                     ),
                     Positioned(
                       right: -5,
                       top: -5,
-                      child: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedImage =
-                                null;
-                          });
+                      child:
+                          IconButton(
+                        onPressed:
+                            () {
+                          setState(
+                            () {
+                              _selectedImage =
+                                  null;
+                            },
+                          );
                         },
                         style:
-                            IconButton.styleFrom(
+                            IconButton
+                                .styleFrom(
                           backgroundColor:
-                              Colors.white,
+                              Colors
+                                  .white,
                         ),
                         icon:
                             const Icon(
@@ -1378,7 +1683,8 @@ Internet connection और Gemini API key check करें।
               ),
             Row(
               crossAxisAlignment:
-                  CrossAxisAlignment.end,
+                  CrossAxisAlignment
+                      .end,
               children: [
                 IconButton(
                   onPressed:
@@ -1391,11 +1697,14 @@ Internet connection और Gemini API key check करें।
                         .add_a_photo_outlined,
                     size: 30,
                     color:
-                        Color(0xFF673AB7),
+                        Color(
+                      0xFF673AB7,
+                    ),
                   ),
                 ),
                 Expanded(
-                  child: TextField(
+                  child:
+                      TextField(
                     controller:
                         _textController,
                     minLines: 1,
@@ -1422,7 +1731,8 @@ Internet connection और Gemini API key check करें।
                           25,
                         ),
                         borderSide:
-                            BorderSide.none,
+                            BorderSide
+                                .none,
                       ),
                       contentPadding:
                           const EdgeInsets
@@ -1433,7 +1743,9 @@ Internet connection और Gemini API key check करें।
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(
+                  width: 4,
+                ),
                 IconButton(
                   onPressed:
                       _loading
@@ -1445,11 +1757,12 @@ Internet connection और Gemini API key check करें।
                             .stop_circle_rounded
                         : Icons.mic_rounded,
                     size: 31,
-                    color: _listening
-                        ? Colors.red
-                        : const Color(
-                            0xFF673AB7,
-                          ),
+                    color:
+                        _listening
+                            ? Colors.red
+                            : const Color(
+                                0xFF673AB7,
+                              ),
                   ),
                 ),
                 IconButton(
@@ -1458,13 +1771,15 @@ Internet connection और Gemini API key check करें।
                           ? null
                           : _sendMessage,
                   icon: Icon(
-                    Icons.send_rounded,
+                    Icons
+                        .send_rounded,
                     size: 34,
-                    color: _loading
-                        ? Colors.grey
-                        : const Color(
-                            0xFF673AB7,
-                          ),
+                    color:
+                        _loading
+                            ? Colors.grey
+                            : const Color(
+                                0xFF673AB7,
+                              ),
                   ),
                 ),
               ],
@@ -1484,7 +1799,8 @@ Internet connection और Gemini API key check करें।
       bottom: false,
       child: Padding(
         padding:
-            const EdgeInsets.fromLTRB(
+            const EdgeInsets
+                .fromLTRB(
           16,
           8,
           10,
@@ -1502,19 +1818,25 @@ Internet connection और Gemini API key check करें।
                   0xFFE9D8FF,
                 ),
                 borderRadius:
-                    BorderRadius.circular(
+                    BorderRadius
+                        .circular(
                   18,
                 ),
               ),
               child:
                   const Icon(
-                Icons.school_rounded,
+                Icons
+                    .school_rounded,
                 size: 32,
                 color:
-                    Color(0xFF673AB7),
+                    Color(
+                  0xFF673AB7,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(
+              width: 12,
+            ),
             const Expanded(
               child: Column(
                 crossAxisAlignment:
@@ -1527,35 +1849,43 @@ Internet connection और Gemini API key check करें।
                     overflow:
                         TextOverflow
                             .ellipsis,
-                    style: TextStyle(
+                    style:
+                        TextStyle(
                       fontSize: 23,
                       fontWeight:
-                          FontWeight.w900,
+                          FontWeight
+                              .w900,
                     ),
                   ),
                   Text(
                     'आपका digital teacher',
-                    style: TextStyle(
+                    style:
+                        TextStyle(
                       fontSize: 14,
                       color:
                           Colors.grey,
                       fontWeight:
-                          FontWeight.w600,
+                          FontWeight
+                              .w600,
                     ),
                   ),
                 ],
               ),
             ),
             IconButton(
-              onPressed: _newChat,
+              onPressed:
+                  _newChat,
               icon:
                   const Icon(
                 Icons
                     .add_comment_outlined,
                 size: 30,
               ),
+              tooltip:
+                  'नई Chat',
             ),
-            PopupMenuButton<String>(
+            PopupMenuButton<
+                String>(
               onSelected:
                   (value) {
                 if (value ==
@@ -1568,8 +1898,7 @@ Internet connection और Gemini API key check करें।
                       const [
                 PopupMenuItem(
                   value: 'clear',
-                  child:
-                      Text(
+                  child: Text(
                     'नई Chat',
                   ),
                 ),
@@ -1611,18 +1940,24 @@ Internet connection और Gemini API key check करें।
   }
 
   // ============================================================
-  // SNACKBAR
+  // MESSAGE / SNACKBAR
   // ============================================================
 
-  void _showMessage(String text) {
-    if (!mounted) return;
+  void _showMessage(
+    String text,
+  ) {
+    if (!mounted) {
+      return;
+    }
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
       SnackBar(
         content: Text(text),
         behavior:
-            SnackBarBehavior.floating,
+            SnackBarBehavior
+                .floating,
       ),
     );
   }
@@ -1632,43 +1967,50 @@ Internet connection और Gemini API key check करें।
   // ============================================================
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       body: Column(
         children: [
           _buildHeader(),
           _buildStudyPanel(),
           Expanded(
-            child: _messages.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    controller:
-                        _scrollController,
-                    padding:
-                        const EdgeInsets
-                            .only(
-                      top: 8,
-                      bottom: 20,
-                    ),
-                    itemCount:
-                        _messages.length +
-                            (_loading
-                                ? 1
-                                : 0),
-                    itemBuilder:
-                        (context, index) {
-                      if (index ==
-                          _messages
-                              .length) {
-                        return
-                            _buildLoadingBubble();
-                      }
+            child:
+                _messages.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        controller:
+                            _scrollController,
+                        padding:
+                            const EdgeInsets
+                                .only(
+                          top: 8,
+                          bottom: 20,
+                        ),
+                        itemCount:
+                            _messages.length +
+                                (_loading
+                                    ? 1
+                                    : 0),
+                        itemBuilder:
+                            (
+                          context,
+                          index,
+                        ) {
+                          if (index ==
+                              _messages
+                                  .length) {
+                            return
+                                _buildLoadingBubble();
+                          }
 
-                      return _buildMessage(
-                        _messages[index],
-                      );
-                    },
-                  ),
+                          return _buildMessage(
+                            _messages[
+                                index],
+                          );
+                        },
+                      ),
           ),
           _buildInputArea(),
         ],
@@ -1686,12 +2028,15 @@ Internet connection और Gemini API key check करें।
           Alignment.centerLeft,
       child: Container(
         margin:
-            const EdgeInsets.symmetric(
+            const EdgeInsets
+                .symmetric(
           horizontal: 16,
           vertical: 8,
         ),
         padding:
-            const EdgeInsets.all(18),
+            const EdgeInsets.all(
+          18,
+        ),
         decoration:
             BoxDecoration(
           color: Colors.white,
@@ -1700,8 +2045,7 @@ Internet connection और Gemini API key check करें।
             22,
           ),
         ),
-        child:
-            const Row(
+        child: const Row(
           mainAxisSize:
               MainAxisSize.min,
           children: [
@@ -1713,13 +2057,17 @@ Internet connection और Gemini API key check करें।
                 strokeWidth: 2.5,
               ),
             ),
-            SizedBox(width: 12),
+            SizedBox(
+              width: 12,
+            ),
             Text(
               'Teacher सोच रहा है...',
-              style: TextStyle(
+              style:
+                  TextStyle(
                 fontSize: 16,
                 fontWeight:
-                    FontWeight.w600,
+                    FontWeight
+                        .w600,
               ),
             ),
           ],
@@ -1736,8 +2084,10 @@ Internet connection और Gemini API key check करें।
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+
     _speech.stop();
     _tts.stop();
+
     super.dispose();
   }
 }
