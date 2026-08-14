@@ -25,10 +25,6 @@ jobs:
           rm -rf app
           flutter create --platforms=android app
           cp pubspec.yaml app/pubspec.yaml
-
-      - name: Copy app source
-        run: |
-          rm -rf app/lib
           cp -r lib app/lib
 
       - name: Remove default Flutter test
@@ -36,28 +32,25 @@ jobs:
           rm -rf app/test
 
       - name: Configure Android permissions
+        working-directory: app
+        shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          manifest = Path(
-              "app/android/app/src/main/AndroidManifest.xml"
-          )
-
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text()
 
           permissions = [
               "android.permission.INTERNET",
               "android.permission.RECORD_AUDIO",
-              "android.permission.CAMERA"
+              "android.permission.CAMERA",
           ]
 
           first_end = text.find(">")
 
           if first_end == -1:
-              raise SystemExit(
-                  "AndroidManifest.xml is invalid"
-              )
+              raise SystemExit("AndroidManifest.xml is invalid")
 
           permission_lines = ""
 
@@ -75,23 +68,21 @@ jobs:
                   + text[first_end + 1:]
               )
 
-          speech_query = (
-              "\n    <queries>\n"
-              "        <intent>\n"
-              "            <action android:name="
-              "\"android.speech.RecognitionService\" />\n"
-              "        </intent>\n"
-              "    </queries>\n"
-          )
+          speech_query = """
+          <queries>
+              <intent>
+                  <action android:name="android.speech.RecognitionService" />
+              </intent>
+          </queries>
+          """
 
           if "android.speech.RecognitionService" not in text:
               text = text.replace(
                   "</manifest>",
-                  speech_query + "</manifest>"
+                  speech_query + "\n</manifest>"
               )
 
           manifest.write_text(text)
-
           print("Android permissions configured successfully.")
           PY
 
@@ -107,9 +98,11 @@ jobs:
 
       - name: Build Release APK
         working-directory: app
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           flutter build apk --release \
-            --dart-define=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+            --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
