@@ -1,25 +1,34 @@
 name: ai_personal_teacher
-description: AI Personal Teacher - Class Wise AI Teacher
+description: AI Personal Teacher - Class Wise Digital Teacher
 publish_to: "none"
 
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.4.0 <4.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  http: ^1.6.0
+
+  # Gemini AI
+  google_generative_ai: ^0.4.7
+
+  # Voice Input
   speech_to_text: ^7.4.0
+
+  # Voice Output
   flutter_tts: ^4.2.5
+
+  # Image Selection
   image_picker: ^1.2.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^5.0.0
 
 flutter:
