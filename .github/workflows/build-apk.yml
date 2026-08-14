@@ -1,4 +1,4 @@
-name: Build AI Personal Teacher APK
+name: AI Personal Teacher APK
 
 on:
   workflow_dispatch:
@@ -18,57 +18,55 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: "3.47.0"
           channel: stable
-          flutter-version: 3.47.0
           cache: true
 
       - name: Check Flutter
-        run: |
-          flutter --version
-          dart --version
+        run: flutter --version
 
-      - name: Check Flutter source
+      - name: Check project files
         run: |
           test -f pubspec.yaml
           test -f lib/main.dart
-          echo "Flutter source files OK"
+          echo "Project files OK"
 
       - name: Create Android project if missing
         run: |
-          if [ ! -f android/app/build.gradle.kts ]; then
-            echo "Android project missing."
-            echo "Creating Android project..."
-            flutter create . --platforms android
-          else
-            echo "Android project already exists."
+          if [ ! -f android/app/build.gradle.kts ] && [ ! -f android/app/build.gradle ]; then
+            flutter create --platforms=android .
           fi
-
-      - name: Remove default Flutter test
-        run: |
-          rm -rf test
-          echo "Default Flutter test removed."
-
-      - name: Configure Android permissions
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-
-          if ! grep -q "android.permission.INTERNET" "$MANIFEST"; then
-            sed -i '/<application/i\
-              <uses-permission android:name="android.permission.INTERNET"/>' "$MANIFEST"
-          fi
-
-          if ! grep -q "android.permission.RECORD_AUDIO" "$MANIFEST"; then
-            sed -i '/<application/i\
-              <uses-permission android:name="android.permission.RECORD_AUDIO"/>' "$MANIFEST"
-          fi
-
-          echo "Android permissions configured."
 
       - name: Check Android project
         run: |
-          test -f android/app/build.gradle.kts
           test -f android/app/src/main/AndroidManifest.xml
           echo "Android project OK"
+
+      - name: Configure Android permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          text = path.read_text()
+
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.RECORD_AUDIO"/>'
+          ]
+
+          for permission in permissions:
+              if permission not in text:
+                  text = text.replace(
+                      '<application',
+                      permission + '\n    <application',
+                      1
+                  )
+
+          path.write_text(text)
+
+          print("Android permissions OK")
+          PY
 
       - name: Get dependencies
         run: |
@@ -91,15 +89,20 @@ jobs:
           flutter build apk --release \
             --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
+      - name: Check APK
+        run: |
+          test -f build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-Personal-Teacher-APK
           path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
 
       - name: Build completed
         run: |
-          echo "======================================"
-          echo "AI PERSONAL TEACHER APK READY"
-          echo "======================================"
+          echo "===================================="
+          echo "BUILD SUCCESS"
+          echo "AI Personal Teacher APK READY"
+          echo "===================================="
