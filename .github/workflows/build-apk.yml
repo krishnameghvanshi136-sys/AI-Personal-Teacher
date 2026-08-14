@@ -20,7 +20,7 @@ jobs:
         with:
           channel: stable
 
-      - name: Create Android Flutter project
+      - name: Create Android project
         run: |
           rm -rf app
           flutter create --platforms=android app
@@ -31,15 +31,10 @@ jobs:
           rm -rf app/lib
           cp -r lib app/lib
 
-      - name: Remove test files
-        run: |
-          rm -rf app/test
-
-      - name: Add Internet permission
+      - name: Configure Android permissions
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           manifest = Path(
               "app/android/app/src/main/AndroidManifest.xml"
@@ -47,25 +42,64 @@ jobs:
 
           text = manifest.read_text()
 
-          permission = (
-              '<uses-permission '
-              'android:name="android.permission.INTERNET"/>'
+          permissions = [
+              "android.permission.INTERNET",
+              "android.permission.RECORD_AUDIO",
+              "android.permission.CAMERA"
+          ]
+
+          first_end = text.find(">")
+
+          if first_end == -1:
+              raise SystemExit(
+                  "AndroidManifest.xml is invalid"
+              )
+
+          permission_lines = ""
+
+          for permission in permissions:
+              if permission not in text:
+                  permission_lines += (
+                      f'\n    <uses-permission '
+                      f'android:name="{permission}"/>'
+                  )
+
+          if permission_lines:
+              text = (
+                  text[:first_end + 1]
+                  + permission_lines
+                  + text[first_end + 1:]
+              )
+
+          speech_query = (
+              "\n    <queries>\n"
+              "        <intent>\n"
+              "            <action android:name="
+              "\"android.speech.RecognitionService\" />\n"
+              "        </intent>\n"
+              "    </queries>\n"
           )
 
-          if permission not in text:
-              text = re.sub(
-                  r'(<manifest\b[^>]*>)',
-                  r'\1\n    ' + permission,
-                  text,
-                  count=1
+          if "android.speech.RecognitionService" not in text:
+              text = text.replace(
+                  "</manifest>",
+                  speech_query + "</manifest>"
               )
 
           manifest.write_text(text)
+
+          print("Android permissions configured successfully.")
           PY
 
       - name: Get dependencies
         working-directory: app
-        run: flutter pub get
+        run: |
+          flutter pub get
+
+      - name: Analyze Flutter project
+        working-directory: app
+        run: |
+          flutter analyze --no-fatal-infos
 
       - name: Build Release APK
         working-directory: app
